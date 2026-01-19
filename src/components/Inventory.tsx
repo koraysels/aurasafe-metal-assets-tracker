@@ -787,6 +787,12 @@ export default function Inventory({
         </CardContent>
       </Card>
 
+      {statusMessage && (
+        <Card className="mb-6 border-emerald-500/30">
+          <CardContent className="p-3 text-xs text-emerald-400">{statusMessage}</CardContent>
+        </Card>
+      )}
+
       <footer className="mt-6 text-center text-xs text-gray-500">
         Spot: {formatMoney(spotByMetal.Gold || 0, currency)}/oz • Cached offline
       </footer>
@@ -804,6 +810,11 @@ export default function Inventory({
           <DialogHeader>
             <DialogTitle>{editingPurchase ? 'Edit Asset' : 'Add Asset'}</DialogTitle>
           </DialogHeader>
+          {assetError && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {assetError}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2 space-y-2">
               <Label>Name</Label>
@@ -935,6 +946,11 @@ export default function Inventory({
           <DialogHeader>
             <DialogTitle>{safeModalMode === 'create' ? 'New Safe' : 'Rename Safe'}</DialogTitle>
           </DialogHeader>
+          {safeError && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {safeError}
+            </div>
+          )}
           <div className="space-y-2">
             <Label>Safe name</Label>
             <Input value={safeName} onChange={(e) => setSafeName(e.target.value)} placeholder="Safe name" />
@@ -944,6 +960,23 @@ export default function Inventory({
               Cancel
             </Button>
             <Button onClick={saveSafe}>{safeModalMode === 'create' ? 'Create' : 'Save'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Overwrite local data?</DialogTitle>
+          </DialogHeader>
+          <div className="text-sm text-muted-foreground">
+            Importing will replace your current safes and purchases.
+          </div>
+          <DialogFooter className="pt-4">
+            <Button variant="outline" onClick={() => setIsImportConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmImport}>Import</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
