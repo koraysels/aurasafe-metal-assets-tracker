@@ -268,7 +268,9 @@ export default function Inventory({
     const doc = getDocument();
     if (!doc) return;
     const a = doc.createElement('a');
+    // @ts-expect-error -- local DocumentLike shim doesn't expose full anchor typings.
     a.href = URL.createObjectURL(blob);
+    // @ts-expect-error -- local DocumentLike shim doesn't expose full anchor typings.
     a.download = `aurasafe-export-${new Date().toISOString().slice(0, 19)}.json`;
     a.click();
     URL.revokeObjectURL(a.href);

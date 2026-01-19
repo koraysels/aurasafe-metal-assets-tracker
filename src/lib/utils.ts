@@ -20,11 +20,31 @@ export function getNavigator(): Navigator | null {
   return (globalThis as any).navigator as Navigator | null;
 }
 
+export type AnchorLike = {
+  href: string;
+  download: string;
+  click: () => void;
+};
+
+export type InputLike = {
+  type: string;
+  accept: string;
+  files: FileList | null;
+  onchange: ((this: GlobalEventHandlers, ev: Event) => any) | null;
+};
+
+export type CanvasLike = {
+  width: number;
+  height: number;
+  getContext: (contextId: '2d') => CanvasRenderingContext2D | null;
+  toDataURL: (type?: string, quality?: number) => string;
+};
+
 export type DocumentLike = {
   createElement: {
-    (tagName: 'a'): HTMLAnchorElement;
-    (tagName: 'canvas'): HTMLCanvasElement;
-    (tagName: 'input'): HTMLInputElement;
+    (tagName: 'a'): AnchorLike;
+    (tagName: 'canvas'): CanvasLike;
+    (tagName: 'input'): InputLike;
     (tagName: string): HTMLElement;
   };
 };
