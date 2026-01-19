@@ -6,6 +6,7 @@ export type Purchase = {
   id: string;
   safeId: string;
   name: string;
+  metal?: 'Gold' | 'Silver' | string;
   date: string; // ISO
   type: 'Coin' | 'Bar' | 'Jewelry' | string;
   weight: number; // grams

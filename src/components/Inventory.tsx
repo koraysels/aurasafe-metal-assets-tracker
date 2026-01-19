@@ -34,7 +34,7 @@ export default function Inventory({
   const [safes, setSafes] = useState<Safe[]>([]);
   const [currentSafe, setCurrentSafe] = useState<string | null>(null);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
-  const [spot, setSpot] = useState<number>(0);
+  const [spotByMetal, setSpotByMetal] = useState<Record<string, number>>({ Gold: 0, Silver: 0 });
   const [currency, setCurrency] = useState<'USD' | 'EUR'>('USD');
   const [fxRates, setFxRates] = useState<Record<string, number>>({});
   const [assetSearch, setAssetSearch] = useState('');
@@ -42,14 +42,20 @@ export default function Inventory({
   const [assetSort, setAssetSort] = useState('date-desc');
   const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
-  const [lastAssetDefaults, setLastAssetDefaults] = useState({ type: 'Coin', currency: 'USD' });
+  const [lastAssetDefaults, setLastAssetDefaults] = useState({
+    type: 'Coin',
+    currency: 'USD',
+    metal: 'Gold',
+  });
   const [editForm, setEditForm] = useState({
     name: '',
     date: '',
+    metal: 'Gold',
     type: 'Coin',
     weight: '',
     buyPrice: '',
     currency: 'USD',
+    isGift: false,
     notes: '',
     link: '',
     imageDataUrl: '',
@@ -102,8 +108,9 @@ export default function Inventory({
   useEffect(() => {
     (async () => {
       try {
-        const sp = await getSpot(currency);
-        setSpot(sp);
+        const goldSpot = await getSpot('Gold', currency);
+        const silverSpot = await getSpot('Silver', currency);
+        setSpotByMetal({ Gold: goldSpot, Silver: silverSpot });
       } catch (error) {
         console.error(error);
       }
@@ -121,6 +128,7 @@ export default function Inventory({
           currencies.map(async (cur) => [cur, await getFxRate(cur, currency)] as const),
         );
         const next: Record<string, number> = {};
+        next[currency] = 1;
         for (const [cur, rate] of entries) next[cur] = rate;
         setFxRates(next);
       } catch (error) {
@@ -151,15 +159,31 @@ export default function Inventory({
   }
 
   const stats = useMemo(() => {
-    const totalWeightG = purchases.reduce((s, p) => s + (p.weight || 0), 0);
-    const totalBasis = purchases.reduce((s, p) => {
-      const rate = fxRates[p.currency] ?? 1;
-      return s + (p.buyPrice || 0) * rate;
-    }, 0);
-    const currentValue = perGramFromOunce(spot) * totalWeightG;
-    const netProfit = currentValue - totalBasis;
-    return { totalWeightG, totalBasis, currentValue, netProfit };
-  }, [purchases, spot, fxRates]);
+    let missingFx = 0;
+    const totals = purchases.reduce(
+      (acc, p) => {
+        const hasPrice = (p.buyPrice || 0) > 0;
+        const rate = p.currency === currency ? 1 : fxRates[p.currency];
+        const rateValid = Number.isFinite(rate) && rate > 0;
+        if (hasPrice && !rateValid) {
+          missingFx += 1;
+          return acc;
+        }
+        const metal = p.metal || 'Gold';
+        const metalSpot = spotByMetal[metal] ?? spotByMetal.Gold ?? 0;
+        acc.basis += hasPrice ? (p.buyPrice || 0) * (rateValid ? rate : 1) : 0;
+        acc.current += perGramFromOunce(metalSpot) * (p.weight || 0);
+        return acc;
+      },
+      { basis: 0, current: 0 },
+    );
+    return {
+      totalBasis: totals.basis,
+      currentValue: totals.current,
+      netProfit: totals.current - totals.basis,
+      missingFx,
+    };
+  }, [purchases, spotByMetal, fxRates, currency]);
 
   function formatMoney(amount: number, code: string) {
     return new Intl.NumberFormat('en-US', {
@@ -178,11 +202,15 @@ export default function Inventory({
       return matchesType && haystack.includes(search);
     });
     const enriched = filtered.map((p) => {
-      const rate = fxRates[p.currency] ?? 1;
-      const basis = (p.buyPrice || 0) * rate;
-      const currentValue = perGramFromOunce(spot) * (p.weight || 0);
+      const rate = fxRates[p.currency];
+      const rateValid = p.currency === currency || (Number.isFinite(rate) && rate > 0);
+      const appliedRate = p.currency === currency ? 1 : rate;
+      const basis = rateValid ? (p.buyPrice || 0) * (appliedRate || 1) : 0;
+      const metal = p.metal || 'Gold';
+      const metalSpot = spotByMetal[metal] ?? spotByMetal.Gold ?? 0;
+      const currentValue = perGramFromOunce(metalSpot) * (p.weight || 0);
       const delta = currentValue - basis;
-      return { purchase: p, basis, currentValue, delta };
+      return { purchase: p, basis, currentValue, delta, rateValid };
     });
     return enriched.sort((a, b) => {
       switch (assetSort) {
@@ -200,7 +228,7 @@ export default function Inventory({
           return 0;
       }
     });
-  }, [purchases, assetTypeFilter, assetSearch, assetSort, fxRates, spot]);
+  }, [purchases, assetTypeFilter, assetSearch, assetSort, fxRates, spotByMetal]);
 
   async function onExport() {
     const data = await exportAllDecrypted(keyMaterial);
@@ -229,6 +257,7 @@ export default function Inventory({
             id: z.string().uuid(),
             safeId: z.string().uuid(),
             name: z.string(),
+            metal: z.string().optional(),
             date: z.string(),
             type: z.string(),
             weight: z.number(),
@@ -261,10 +290,12 @@ export default function Inventory({
     setEditForm({
       name: purchase.name || '',
       date: purchase.date || new Date().toISOString().slice(0, 10),
+      metal: purchase.metal || 'Gold',
       type: purchase.type || 'Coin',
       weight: String(purchase.weight ?? ''),
       buyPrice: String(purchase.buyPrice ?? ''),
       currency: purchase.currency || 'USD',
+      isGift: !purchase.buyPrice,
       notes: purchase.notes || '',
       link: purchase.link || '',
       imageDataUrl: purchase.imageDataUrl || '',
@@ -276,10 +307,12 @@ export default function Inventory({
     setEditForm({
       name: '',
       date: new Date().toISOString().slice(0, 10),
+      metal: lastAssetDefaults.metal || 'Gold',
       type: lastAssetDefaults.type,
       weight: '',
       buyPrice: '',
       currency: lastAssetDefaults.currency || currency,
+      isGift: false,
       notes: '',
       link: '',
       imageDataUrl: '',
@@ -301,7 +334,7 @@ export default function Inventory({
       return;
     }
     const nextWeight = Number(editForm.weight);
-    const nextPrice = Number(editForm.buyPrice);
+    const nextPrice = editForm.isGift ? 0 : Number(editForm.buyPrice);
     if (!editForm.name.trim()) {
       alert('Please provide a purchase name.');
       return;
@@ -310,7 +343,7 @@ export default function Inventory({
       alert('Weight must be greater than 0.');
       return;
     }
-    if (!Number.isFinite(nextPrice) || nextPrice <= 0) {
+    if (!editForm.isGift && (!Number.isFinite(nextPrice) || nextPrice <= 0)) {
       alert('Buy price must be greater than 0.');
       return;
     }
@@ -319,6 +352,7 @@ export default function Inventory({
         ...editingPurchase,
         name: editForm.name.trim(),
         date: editForm.date.trim(),
+        metal: editForm.metal.trim(),
         type: editForm.type.trim(),
         weight: nextWeight,
         buyPrice: nextPrice,
@@ -332,6 +366,7 @@ export default function Inventory({
         safeId,
         name: editForm.name.trim(),
         date: editForm.date.trim(),
+        metal: editForm.metal.trim(),
         type: editForm.type.trim(),
         weight: nextWeight,
         buyPrice: nextPrice,
@@ -341,7 +376,11 @@ export default function Inventory({
         imageDataUrl: editForm.imageDataUrl || undefined,
       });
     }
-    setLastAssetDefaults({ type: editForm.type.trim(), currency: editForm.currency.trim() });
+    setLastAssetDefaults({
+      type: editForm.type.trim(),
+      currency: editForm.currency.trim(),
+      metal: editForm.metal.trim(),
+    });
     setEditingPurchase(null);
     setIsAssetModalOpen(false);
     await refreshPurchases(safeId);
@@ -519,9 +558,25 @@ export default function Inventory({
         </Card>
       </section>
 
+      {stats.missingFx > 0 && (
+        <Card className="mb-6 border-amber-500/30">
+          <CardContent className="p-3 text-xs text-amber-400">
+            Some assets use currencies without a current FX rate. Their basis is shown in the
+            original currency until rates update.
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="mb-6">
         <CardContent className="p-4 text-sm text-muted-foreground">
-        Gold spot: {formatMoney(spot, currency)}/oz • {formatMoney(perGramFromOunce(spot), currency)}/g
+          <div>
+            Gold spot: {formatMoney(spotByMetal.Gold || 0, currency)}/oz •{' '}
+            {formatMoney(perGramFromOunce(spotByMetal.Gold || 0), currency)}/g
+          </div>
+          <div>
+            Silver spot: {formatMoney(spotByMetal.Silver || 0, currency)}/oz •{' '}
+            {formatMoney(perGramFromOunce(spotByMetal.Silver || 0), currency)}/g
+          </div>
         </CardContent>
       </Card>
 
@@ -559,84 +614,120 @@ export default function Inventory({
             <option value="profit-asc">Profit (low → high)</option>
           </select>
         </div>
-        <div className="grid gap-3 md:grid-cols-1">
-          {assetItems.map(({ purchase: p, basis, currentValue, delta }) => {
-            const deltaPct = basis > 0 ? (delta / basis) * 100 : 0;
-            return (
-              <Card key={p.id} className="bg-muted/30">
-                <CardContent className="p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="pt-1">{renderPurchaseMedia(p)}</div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">{p.type}</div>
-                      <div className="text-lg font-semibold">{p.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {p.date} • {p.weight} g
+        <div className="max-h-[520px] overflow-y-auto pr-1">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {assetItems.map(({ purchase: p, basis, currentValue, delta, rateValid }) => {
+              const deltaPct = rateValid && basis > 0 ? (delta / basis) * 100 : 0;
+              return (
+                <Card key={p.id} className="bg-muted/30">
+                  <CardContent className="p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <div className="pt-1">{renderPurchaseMedia(p)}</div>
+                        <div>
+                          <div className="text-sm text-muted-foreground">
+                            {(p.metal || 'Gold')} • {p.type}
+                          </div>
+                          <div className="text-lg font-semibold">{p.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {p.date} • {p.weight} g
+                          </div>
+                        </div>
+                      </div>
+                      <div
+                        className={`text-right text-sm font-semibold ${
+                          delta >= 0 ? 'text-emerald-400' : 'text-red-400'
+                        }`}
+                      >
+                        {rateValid ? (
+                          <>
+                            <div className="flex items-center justify-end gap-1">
+                              {delta >= 0 ? (
+                                <svg viewBox="0 0 20 20" className="h-4 w-4 text-emerald-400" aria-hidden="true">
+                                  <path d="M10 4l5 6h-3v6H8v-6H5l5-6z" fill="currentColor" />
+                                </svg>
+                              ) : (
+                                <svg viewBox="0 0 20 20" className="h-4 w-4 text-red-400" aria-hidden="true">
+                                  <path d="M10 16l-5-6h3V4h4v6h3l-5 6z" fill="currentColor" />
+                                </svg>
+                              )}
+                              <span>{formatMoney(delta, currency)}</span>
+                            </div>
+                            <div className="text-xs text-gray-500">{deltaPct.toFixed(2)}%</div>
+                          </>
+                        ) : (
+                          <div className="text-xs text-amber-400">FX pending</div>
+                        )}
                       </div>
                     </div>
-                  </div>
-                  <div
-                    className={`text-right text-sm font-semibold ${
-                      delta >= 0 ? 'text-emerald-400' : 'text-red-400'
-                    }`}
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      {delta >= 0 ? (
-                        <svg viewBox="0 0 20 20" className="h-4 w-4 text-emerald-400" aria-hidden="true">
-                          <path d="M10 4l5 6h-3v6H8v-6H5l5-6z" fill="currentColor" />
-                        </svg>
-                      ) : (
-                        <svg viewBox="0 0 20 20" className="h-4 w-4 text-red-400" aria-hidden="true">
-                          <path d="M10 16l-5-6h3V4h4v6h3l-5 6z" fill="currentColor" />
-                        </svg>
-                      )}
-                      <span>{formatMoney(delta, currency)}</span>
+                    <div className="mt-2 grid gap-2 text-sm text-muted-foreground md:grid-cols-3">
+                      <div>
+                        <div className="text-xs uppercase text-muted-foreground">Basis</div>
+                        <div>
+                          {p.buyPrice ? formatMoney(basis, rateValid ? currency : p.currency) : 'Gifted'}
+                          {!rateValid && p.buyPrice ? (
+                            <span className="ml-2 text-[10px] text-amber-400">FX pending</span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs uppercase text-muted-foreground">Current Value</div>
+                        <div>{formatMoney(currentValue, currency)}</div>
+                      </div>
+                      <div className="flex items-end justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={() => editPurchase(p)}>
+                          Edit
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={async () => {
+                            await deletePurchase(p.id);
+                            if (currentSafe) await refreshPurchases(currentSafe);
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500">{deltaPct.toFixed(2)}%</div>
-                  </div>
-                </div>
-                <div className="mt-2 grid gap-2 text-sm text-muted-foreground md:grid-cols-2">
-                  <div>
-                    <div className="text-xs uppercase text-muted-foreground">Basis</div>
-                    <div>{formatMoney(basis, currency)}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs uppercase text-muted-foreground">Current Value</div>
-                    <div>{formatMoney(currentValue, currency)}</div>
-                  </div>
-                </div>
-                <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                  {p.link ? (
-                    <a href={p.link} target="_blank" rel="noreferrer" className="text-brand underline">
-                      View product
-                    </a>
-                  ) : (
-                    <span />
-                  )}
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => editPurchase(p)}>
-                      Edit
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={async () => {
-                        await deletePurchase(p.id);
-                        if (currentSafe) await refreshPurchases(currentSafe);
-                      }}
-                    >
-                      Delete
+                    {p.notes && (
+                      <details className="mt-2 text-xs text-muted-foreground">
+                        <summary className="cursor-pointer">
+                          Notes:{' '}
+                          <span className="inline-block max-w-[260px] truncate align-bottom">
+                            {p.notes}
+                          </span>
+                        </summary>
+                        <div className="mt-1 break-words">{p.notes}</div>
+                      </details>
+                    )}
+                    <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                      {p.link ? (
+                        <a href={p.link} target="_blank" rel="noreferrer" className="text-brand underline">
+                          View product
+                        </a>
+                      ) : (
+                        <span />
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+            {!assetItems.length && (
+              <Card className="bg-muted/30">
+                <CardContent className="p-6 text-center">
+                  <div className="text-sm text-muted-foreground">Add your first asset.</div>
+                  <div className="mt-3 flex justify-center">
+                    <Button onClick={openAddAssetModal}>
+                      <span className="text-lg leading-none">+</span>
+                      Add Asset
                     </Button>
                   </div>
-                </div>
                 </CardContent>
               </Card>
-            );
-          })}
-          {!assetItems.length && (
-            <div className="text-sm text-gray-500">No assets yet. Add your first purchase above.</div>
-          )}
+            )}
+          </div>
         </div>
         </CardContent>
       </Card>
@@ -651,7 +742,7 @@ export default function Inventory({
       </Card>
 
       <footer className="mt-6 text-center text-xs text-gray-500">
-        Spot: {formatMoney(spot, currency)}/oz • Cached offline
+        Spot: {formatMoney(spotByMetal.Gold || 0, currency)}/oz • Cached offline
       </footer>
 
       <Dialog
@@ -685,6 +776,17 @@ export default function Inventory({
               />
             </div>
             <div className="space-y-2">
+              <Label>Metal</Label>
+              <select
+                value={editForm.metal}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, metal: e.target.value }))}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option>Gold</option>
+                <option>Silver</option>
+              </select>
+            </div>
+            <div className="space-y-2">
               <Label>Type</Label>
               <select
                 value={editForm.type}
@@ -715,6 +817,7 @@ export default function Inventory({
                 step="0.01"
                 min="0.01"
                 placeholder={`Buy Price (${editForm.currency || currency})`}
+                disabled={editForm.isGift}
               />
             </div>
             <div className="space-y-2">
@@ -727,6 +830,16 @@ export default function Inventory({
                 <option value="USD">USD</option>
                 <option value="EUR">EUR</option>
               </select>
+            </div>
+            <div className="col-span-2 flex items-center gap-2 text-sm text-muted-foreground">
+              <input
+                id="gifted"
+                type="checkbox"
+                checked={editForm.isGift}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, isGift: e.target.checked }))}
+                className="h-4 w-4 rounded border border-input"
+              />
+              <Label htmlFor="gifted">Gifted / no purchase price</Label>
             </div>
             <div className="col-span-2 space-y-2">
               <Label>Notes</Label>

@@ -1,3 +1,4 @@
+import { Convert } from 'easy-currencies';
 import { db } from './db';
 
 async function getCachedJson<T>(key: string, maxAgeMs: number) {
@@ -21,15 +22,17 @@ async function setCachedJson(key: string, data: unknown, source: string) {
   });
 }
 
-export async function getSpot(currency = 'USD', forceRefresh = false): Promise<number> {
+export async function getSpot(metal: 'Gold' | 'Silver' | string, currency = 'USD', forceRefresh = false): Promise<number> {
   const normalized = currency.toUpperCase();
-  const cacheKey = `current_gold_${normalized}`;
+  const metalKey = (metal || 'Gold').toLowerCase();
+  const asset = metalKey === 'silver' ? 'XAG' : 'PAXG';
+  const cacheKey = `current_${asset}_${normalized}`;
   const cached = await db.priceCache.get(cacheKey);
   const fiveMin = 5 * 60 * 1000;
   if (!forceRefresh && cached && Date.now() - cached.timestamp < fiveMin) return cached.price;
 
   try {
-    const resp = await fetch(`https://api.coinbase.com/v2/prices/PAXG-${normalized}/spot`, {
+    const resp = await fetch(`https://api.coinbase.com/v2/prices/${asset}-${normalized}/spot`, {
       cache: 'no-store',
     });
     const json = await resp.json();
@@ -40,12 +43,12 @@ export async function getSpot(currency = 'USD', forceRefresh = false): Promise<n
       id: cacheKey,
       price,
       timestamp: Date.now(),
-      source: `Coinbase-PAXG-${normalized}`,
+      source: `Coinbase-${asset}-${normalized}`,
     });
     return price;
   } catch (e) {
     if (cached) return cached.price;
-    return 1900;
+    return metalKey === 'silver' ? 25 : 1900;
   }
 }
 
@@ -54,25 +57,22 @@ export async function getFxRate(from: string, to: string) {
   const base = from.toUpperCase();
   const target = to.toUpperCase();
   const cacheKey = `fx_${base}`;
-  const cached = await getCachedJson<Record<string, string>>(cacheKey, 12 * 60 * 60 * 1000);
-  let rates = cached;
+  const cached = await getCachedJson<{ rates: Record<string, number> }>(cacheKey, 12 * 60 * 60 * 1000);
+  let rates = cached?.rates;
 
   if (!rates) {
     try {
-      const resp = await fetch(`https://api.coinbase.com/v2/exchange-rates?currency=${base}`, {
-        cache: 'no-store',
-      });
-      const json = await resp.json();
-      rates = json?.data?.rates || null;
-      if (rates) await setCachedJson(cacheKey, rates, `Coinbase-FX-${base}`);
+      const convert = await Convert().from(base).fetch();
+      rates = convert?.rates as Record<string, number>;
+      if (rates) await setCachedJson(cacheKey, { rates }, `easy-currencies-${base}`);
     } catch {
-      rates = null;
+      rates = undefined;
     }
   }
 
   const rate = rates ? Number(rates[target]) : NaN;
   if (isFinite(rate) && rate > 0) return rate;
-  return base === 'USD' && target === 'EUR' ? 0.9 : 1;
+  return NaN;
 }
 
 export function perGramFromOunce(perOunce: number) {
