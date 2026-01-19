@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Lock } from 'lucide-react';
 import {
   createPurchase,
@@ -17,6 +17,12 @@ import {
 } from '../lib/db';
 import { getFxRate, getSpot, perGramFromOunce } from '../lib/prices';
 import { z } from 'zod';
+import ThemeToggle from './theme-toggle';
+import { Button } from './ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
 
 export default function Inventory({
   keyMaterial,
@@ -31,8 +37,6 @@ export default function Inventory({
   const [spot, setSpot] = useState<number>(0);
   const [currency, setCurrency] = useState<'USD' | 'EUR'>('USD');
   const [fxRates, setFxRates] = useState<Record<string, number>>({});
-  const [pendingImageDataUrl, setPendingImageDataUrl] = useState<string | undefined>(undefined);
-  const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [assetSearch, setAssetSearch] = useState('');
   const [assetTypeFilter, setAssetTypeFilter] = useState('All');
   const [assetSort, setAssetSort] = useState('date-desc');
@@ -246,21 +250,6 @@ export default function Inventory({
     input.click();
   }
 
-  async function onImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) {
-      setPendingImageDataUrl(undefined);
-      return;
-    }
-    const dataUrl = await resizeImageToDataUrl(file, 180);
-    setPendingImageDataUrl(dataUrl);
-  }
-
-  function clearPendingImage() {
-    setPendingImageDataUrl(undefined);
-    if (imageInputRef.current) imageInputRef.current.value = '';
-  }
-
   async function removePurchaseImage(purchase: Purchase) {
     await upsertPurchase(keyMaterial, { ...purchase, imageDataUrl: undefined });
     if (currentSafe) await refreshPurchases(currentSafe);
@@ -428,31 +417,29 @@ export default function Inventory({
           <img src="/aurasafe-logo.png" alt="AuraSafe" className="h-8 w-8" />
           <h1 className="text-2xl font-semibold">AuraSafe</h1>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={onLock}
-            aria-label="Lock"
-            className="rounded-md bg-gray-800 p-2 text-sm ring-1 ring-gray-700"
-          >
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Button variant="outline" size="icon" onClick={onLock} aria-label="Lock">
             <Lock className="h-4 w-4" />
-          </button>
-          <button onClick={onExport} className="rounded-md bg-gray-800 px-3 py-1.5 text-sm ring-1 ring-gray-700">
+          </Button>
+          <Button variant="outline" onClick={onExport}>
             Export
-          </button>
-          <button onClick={onImport} className="rounded-md bg-gray-800 px-3 py-1.5 text-sm ring-1 ring-gray-700">
+          </Button>
+          <Button variant="outline" onClick={onImport}>
             Import
-          </button>
+          </Button>
         </div>
       </header>
 
-      <section className="mb-6 rounded-lg border border-gray-800 bg-gray-900 p-4">
+      <Card className="mb-6">
+        <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <label className="text-sm text-gray-400">Safe</label>
+            <Label>Safe</Label>
             <select
               value={currentSafe ?? ''}
               onChange={(e) => setCurrentSafe(e.target.value)}
-              className="rounded-md bg-gray-800 px-3 py-1.5 ring-1 ring-gray-700"
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
             >
               {safes.map((safe) => (
                 <option key={safe.id} value={safe.id}>
@@ -462,56 +449,54 @@ export default function Inventory({
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-400">Currency</label>
+            <Label>Currency</Label>
             <select
               value={currency}
               onChange={(e) => setCurrency(e.target.value as 'USD' | 'EUR')}
-              className="rounded-md bg-gray-800 px-3 py-1.5 ring-1 ring-gray-700"
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
             >
               <option value="USD">USD</option>
               <option value="EUR">EUR</option>
             </select>
-            <button
-              onClick={addSafe}
-              className="rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-black"
-            >
-              New Safe
-            </button>
+            <Button onClick={addSafe}>New Safe</Button>
             {currentSafe && (
-              <button
-                onClick={renameSafe}
-                className="rounded-md bg-gray-800 px-3 py-1.5 text-sm ring-1 ring-gray-700"
-              >
+              <Button variant="outline" onClick={renameSafe}>
                 Rename
-              </button>
+              </Button>
             )}
             {currentSafe && (
-              <button
+              <Button
+                variant="destructive"
                 onClick={async () => {
                   await deleteSafe(currentSafe);
                   setCurrentSafe(null);
                   await refreshSafes();
                 }}
-                className="rounded-md bg-red-600/80 px-3 py-1.5 text-sm"
               >
                 Delete
-              </button>
+              </Button>
             )}
           </div>
         </div>
-      </section>
+        </CardContent>
+      </Card>
 
       <section className="mb-6 grid gap-4 md:grid-cols-3">
-        <div className="rounded-lg border border-gray-800 bg-gray-900 p-4">
-          <div className="text-xs uppercase text-gray-400">Basis</div>
+        <Card>
+          <CardContent className="p-4">
+          <div className="text-xs uppercase text-muted-foreground">Basis</div>
           <div className="text-2xl font-semibold">{formatMoney(stats.totalBasis, currency)}</div>
-        </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900 p-4">
-          <div className="text-xs uppercase text-gray-400">Current Value</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+          <div className="text-xs uppercase text-muted-foreground">Current Value</div>
           <div className="text-2xl font-semibold">{formatMoney(stats.currentValue, currency)}</div>
-        </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900 p-4">
-          <div className="text-xs uppercase text-gray-400">Net</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+          <div className="text-xs uppercase text-muted-foreground">Net</div>
           <div
             className={`text-2xl font-semibold ${
               stats.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'
@@ -530,26 +515,32 @@ export default function Inventory({
               <span>{formatMoney(stats.netProfit, currency)}</span>
             </span>
           </div>
-        </div>
+          </CardContent>
+        </Card>
       </section>
 
-      <section className="mb-6 rounded-lg border border-gray-800 bg-gray-900 p-4 text-sm text-gray-300">
+      <Card className="mb-6">
+        <CardContent className="p-4 text-sm text-muted-foreground">
         Gold spot: {formatMoney(spot, currency)}/oz • {formatMoney(perGramFromOunce(spot), currency)}/g
-      </section>
+        </CardContent>
+      </Card>
 
-      <section className="mb-6 rounded-lg border border-gray-800 bg-gray-900 p-4">
-        <h2 className="mb-3 font-medium">Assets</h2>
+      <Card className="mb-6">
+        <CardHeader className="pb-2">
+          <CardTitle>Assets</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <input
+          <Input
             value={assetSearch}
             onChange={(e) => setAssetSearch(e.target.value)}
             placeholder="Search name or notes"
-            className="min-w-[220px] flex-1 rounded-md bg-gray-800 px-3 py-2 text-sm ring-1 ring-gray-700"
+            className="min-w-[220px] flex-1"
           />
           <select
             value={assetTypeFilter}
             onChange={(e) => setAssetTypeFilter(e.target.value)}
-            className="rounded-md bg-gray-800 px-3 py-2 text-sm ring-1 ring-gray-700"
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value="All">All</option>
             <option value="Coin">Coin</option>
@@ -559,7 +550,7 @@ export default function Inventory({
           <select
             value={assetSort}
             onChange={(e) => setAssetSort(e.target.value)}
-            className="rounded-md bg-gray-800 px-3 py-2 text-sm ring-1 ring-gray-700"
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value="date-desc">Date (newest)</option>
             <option value="date-asc">Date (oldest)</option>
@@ -572,14 +563,15 @@ export default function Inventory({
           {assetItems.map(({ purchase: p, basis, currentValue, delta }) => {
             const deltaPct = basis > 0 ? (delta / basis) * 100 : 0;
             return (
-              <div key={p.id} className="rounded-lg border border-gray-800 bg-gray-950/40 p-3">
+              <Card key={p.id} className="bg-muted/30">
+                <CardContent className="p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
                     <div className="pt-1">{renderPurchaseMedia(p)}</div>
                     <div>
-                      <div className="text-sm text-gray-400">{p.type}</div>
+                      <div className="text-sm text-muted-foreground">{p.type}</div>
                       <div className="text-lg font-semibold">{p.name}</div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-muted-foreground">
                         {p.date} • {p.weight} g
                       </div>
                     </div>
@@ -604,17 +596,17 @@ export default function Inventory({
                     <div className="text-xs text-gray-500">{deltaPct.toFixed(2)}%</div>
                   </div>
                 </div>
-                <div className="mt-2 grid gap-2 text-sm text-gray-300 md:grid-cols-2">
+                <div className="mt-2 grid gap-2 text-sm text-muted-foreground md:grid-cols-2">
                   <div>
-                    <div className="text-xs uppercase text-gray-500">Basis</div>
+                    <div className="text-xs uppercase text-muted-foreground">Basis</div>
                     <div>{formatMoney(basis, currency)}</div>
                   </div>
                   <div>
-                    <div className="text-xs uppercase text-gray-500">Current Value</div>
+                    <div className="text-xs uppercase text-muted-foreground">Current Value</div>
                     <div>{formatMoney(currentValue, currency)}</div>
                   </div>
                 </div>
-                <div className="mt-2 flex items-center justify-between text-xs text-gray-400">
+                <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
                   {p.link ? (
                     <a href={p.link} target="_blank" rel="noreferrer" className="text-brand underline">
                       View product
@@ -623,169 +615,161 @@ export default function Inventory({
                     <span />
                   )}
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => editPurchase(p)}
-                      className="rounded-md bg-gray-800 px-2 py-1 text-white ring-1 ring-gray-700"
-                    >
+                    <Button variant="outline" size="sm" onClick={() => editPurchase(p)}>
                       Edit
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
                       onClick={async () => {
                         await deletePurchase(p.id);
                         if (currentSafe) await refreshPurchases(currentSafe);
                       }}
-                      className="rounded-md bg-red-600/80 px-2 py-1 text-white"
                     >
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 </div>
-              </div>
+                </CardContent>
+              </Card>
             );
           })}
           {!assetItems.length && (
             <div className="text-sm text-gray-500">No assets yet. Add your first purchase above.</div>
           )}
         </div>
-      </section>
+        </CardContent>
+      </Card>
 
-      <section className="mb-6 rounded-lg border border-gray-800 bg-gray-900 p-4">
-        <button
-          onClick={openAddAssetModal}
-          className="inline-flex items-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-black"
-        >
-          <span className="text-lg leading-none">+</span>
-          Add Asset
-        </button>
-      </section>
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <Button onClick={openAddAssetModal}>
+            <span className="text-lg leading-none">+</span>
+            Add Asset
+          </Button>
+        </CardContent>
+      </Card>
 
       <footer className="mt-6 text-center text-xs text-gray-500">
         Spot: {formatMoney(spot, currency)}/oz • Cached offline
       </footer>
 
-      {isAssetModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-lg rounded-xl border border-gray-800 bg-gray-900 p-5 shadow-xl">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">
-                {editingPurchase ? 'Edit Asset' : 'Add Asset'}
-              </h3>
-              <button
-                onClick={() => {
-                  setEditingPurchase(null);
-                  setIsAssetModalOpen(false);
-                }}
-                className="rounded-md bg-gray-800 px-2 py-1 text-xs ring-1 ring-gray-700"
-              >
-                Close
-              </button>
-            </div>
+      <Dialog
+        open={isAssetModalOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingPurchase(null);
+          }
+          setIsAssetModalOpen(open);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingPurchase ? 'Edit Asset' : 'Add Asset'}</DialogTitle>
+          </DialogHeader>
           <div className="grid grid-cols-2 gap-3">
-                <input
-                  value={editForm.name}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
-                  placeholder="Name"
-                  className="col-span-2 rounded-md bg-gray-800 px-3 py-2 ring-1 ring-gray-700"
-                />
-              <input
+            <div className="col-span-2 space-y-2">
+              <Label>Name</Label>
+              <Input
+                value={editForm.name}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Name"
+              />
+            </div>
+            <div className="col-span-2 space-y-2">
+              <Label>Date</Label>
+              <Input
                 value={editForm.date}
                 onChange={(e) => setEditForm((prev) => ({ ...prev, date: e.target.value }))}
                 type="date"
-                className="col-span-2 rounded-md bg-gray-800 px-3 py-2 ring-1 ring-gray-700"
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Type</Label>
               <select
                 value={editForm.type}
                 onChange={(e) => setEditForm((prev) => ({ ...prev, type: e.target.value }))}
-                className="rounded-md bg-gray-800 px-3 py-2 ring-1 ring-gray-700"
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               >
                 <option>Coin</option>
                 <option>Bar</option>
                 <option>Jewelry</option>
               </select>
-              <input
+            </div>
+            <div className="space-y-2">
+              <Label>Weight (g)</Label>
+              <Input
                 value={editForm.weight}
                 onChange={(e) => setEditForm((prev) => ({ ...prev, weight: e.target.value }))}
                 type="number"
                 step="0.0001"
                 min="0.0001"
-                placeholder="Weight (g)"
-                className="rounded-md bg-gray-800 px-3 py-2 ring-1 ring-gray-700"
               />
-                <input
-                  value={editForm.buyPrice}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, buyPrice: e.target.value }))}
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  placeholder={`Buy Price (${editForm.currency || currency})`}
-                  className="rounded-md bg-gray-800 px-3 py-2 ring-1 ring-gray-700"
-                />
+            </div>
+            <div className="space-y-2">
+              <Label>Buy Price</Label>
+              <Input
+                value={editForm.buyPrice}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, buyPrice: e.target.value }))}
+                type="number"
+                step="0.01"
+                min="0.01"
+                placeholder={`Buy Price (${editForm.currency || currency})`}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Currency</Label>
               <select
                 value={editForm.currency}
                 onChange={(e) => setEditForm((prev) => ({ ...prev, currency: e.target.value }))}
-                className="rounded-md bg-gray-800 px-3 py-2 ring-1 ring-gray-700"
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               >
                 <option value="USD">USD</option>
                 <option value="EUR">EUR</option>
               </select>
-              <input
+            </div>
+            <div className="col-span-2 space-y-2">
+              <Label>Notes</Label>
+              <Input
                 value={editForm.notes}
                 onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
                 placeholder="Notes"
-                className="col-span-2 rounded-md bg-gray-800 px-3 py-2 ring-1 ring-gray-700"
               />
-              <input
+            </div>
+            <div className="col-span-2 space-y-2">
+              <Label>Product link</Label>
+              <Input
                 value={editForm.link}
                 onChange={(e) => setEditForm((prev) => ({ ...prev, link: e.target.value }))}
                 type="url"
                 placeholder="Product link"
-                className="col-span-2 rounded-md bg-gray-800 px-3 py-2 ring-1 ring-gray-700"
               />
-              <div className="col-span-2 flex flex-col gap-2">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={onEditImageChange}
-                  className="rounded-md bg-gray-800 px-3 py-2 ring-1 ring-gray-700"
-                />
-                {editForm.imageDataUrl && (
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={editForm.imageDataUrl}
-                      alt="Preview"
-                      className="h-10 w-10 rounded-md object-cover ring-1 ring-gray-700"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setEditForm((prev) => ({ ...prev, imageDataUrl: '' }))}
-                      className="text-xs text-gray-400 underline"
-                    >
-                      Remove image
-                    </button>
-                  </div>
-                )}
-              </div>
             </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                onClick={() => {
-                  setEditingPurchase(null);
-                  setIsAssetModalOpen(false);
-                }}
-                className="rounded-md bg-gray-800 px-3 py-2 text-sm ring-1 ring-gray-700"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveEdit}
-                className="rounded-md bg-brand px-3 py-2 text-sm font-medium text-black"
-              >
-                Save
-              </button>
+            <div className="col-span-2 space-y-2">
+              <Label>Image</Label>
+              <Input type="file" accept="image/*" onChange={onEditImageChange} />
+              {editForm.imageDataUrl && (
+                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <img
+                    src={editForm.imageDataUrl}
+                    alt="Preview"
+                    className="h-10 w-10 rounded-md object-cover ring-1 ring-border"
+                  />
+                  <Button variant="ghost" size="sm" onClick={() => setEditForm((prev) => ({ ...prev, imageDataUrl: '' }))}>
+                    Remove image
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      )}
+          <DialogFooter className="pt-4">
+            <Button variant="outline" onClick={() => setIsAssetModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={saveEdit}>{editingPurchase ? 'Save' : 'Add'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

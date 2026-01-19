@@ -8,9 +8,6 @@ export default function RegisterSW() {
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production') return;
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
-    const serwist = (window as typeof window & { serwist?: { register: () => Promise<ServiceWorkerRegistration> } })
-      .serwist;
-    if (!serwist?.register) return;
 
     const onControllerChange = () => {
       window.location.reload();
@@ -18,9 +15,16 @@ export default function RegisterSW() {
 
     navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
 
-    serwist
-      .register()
-      .then((registration) => {
+    navigator.serviceWorker
+      .getRegistrations()
+      .then((registrations) => {
+        const registration = registrations.find((reg) =>
+          reg.active?.scriptURL.includes('/serwist/sw.js') ||
+          reg.waiting?.scriptURL.includes('/serwist/sw.js') ||
+          reg.installing?.scriptURL.includes('/serwist/sw.js')
+        );
+        if (!registration) return;
+
         const onWaiting = (worker: ServiceWorker | null) => {
           if (!worker) return;
           setWaitingWorker(worker);

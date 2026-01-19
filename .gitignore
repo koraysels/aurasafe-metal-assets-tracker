@@ -22,5 +22,9 @@ pnpm-debug.log*
 
 # misc
 *.tsbuildinfo
+
+# Serwist
+public/sw*
+public/service-worker*
 AGENTS.md
 SPECS.md
