@@ -22,3 +22,5 @@ pnpm-debug.log*
 
 # misc
 *.tsbuildinfo
+AGENTS.md
+SPECS.md
