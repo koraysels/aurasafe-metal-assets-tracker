@@ -13,7 +13,12 @@ export default function Page() {
   useEffect(() => {
     const hasHash = !!getStoredHash();
     setMode(hasHash ? 'unlock' : 'setup');
-    const sessionPin = typeof window === 'undefined' ? null : sessionStorage.getItem(SESSION_PIN_KEY);
+    const sessionStorageSafe = (typeof globalThis === 'undefined'
+      ? undefined
+      : (globalThis as any).sessionStorage) as
+      | { getItem: (key: string) => string | null }
+      | undefined;
+    const sessionPin = sessionStorageSafe?.getItem(SESSION_PIN_KEY) ?? null;
     if (!sessionPin || !hasHash) return;
     (async () => {
       const salt = getOrCreateSalt();
@@ -30,25 +35,33 @@ export default function Page() {
     const salt = getOrCreateSalt();
     const existingHash = getStoredHash();
     const newHash = await hashPin(pin, salt);
+    const sessionStorageSafe = (typeof globalThis === 'undefined'
+      ? undefined
+      : (globalThis as any).sessionStorage) as
+      | { setItem: (key: string, value: string) => void }
+      | undefined;
     if (!existingHash) {
       setStoredHash(newHash);
       const key = await deriveKeyFromPin(pin, salt);
       setKeyMaterial(key);
       setMode('unlock');
-      sessionStorage.setItem(SESSION_PIN_KEY, pin);
+      sessionStorageSafe?.setItem(SESSION_PIN_KEY, pin);
       return;
     }
     if (newHash !== existingHash) throw new Error('Incorrect PIN');
     const key = await deriveKeyFromPin(pin, salt);
     setKeyMaterial(key);
-    sessionStorage.setItem(SESSION_PIN_KEY, pin);
+    sessionStorageSafe?.setItem(SESSION_PIN_KEY, pin);
   }
 
   function onLock() {
     setKeyMaterial(null);
-    if (typeof window !== 'undefined') {
-      sessionStorage.removeItem(SESSION_PIN_KEY);
-    }
+    const sessionStorageSafe = (typeof globalThis === 'undefined'
+      ? undefined
+      : (globalThis as any).sessionStorage) as
+      | { removeItem: (key: string) => void }
+      | undefined;
+    sessionStorageSafe?.removeItem(SESSION_PIN_KEY);
   }
 
   return (
