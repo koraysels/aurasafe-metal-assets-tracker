@@ -7,6 +7,11 @@ export default function PinOverlay({ mode, onUnlock }: { mode: 'setup' | 'unlock
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  function readValue(target: EventTarget | null) {
+    const value = (target as { value?: string } | null)?.value;
+    return typeof value === 'string' ? value : '';
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -46,7 +51,7 @@ export default function PinOverlay({ mode, onUnlock }: { mode: 'setup' | 'unlock
             inputMode="numeric"
             placeholder="PIN"
             value={pin}
-            onChange={(e) => setPin(e.target.value)}
+            onChange={(e) => setPin(readValue(e.target))}
           />
           {mode === 'setup' && (
             <input
@@ -55,7 +60,7 @@ export default function PinOverlay({ mode, onUnlock }: { mode: 'setup' | 'unlock
               inputMode="numeric"
               placeholder="Confirm PIN"
               value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
+              onChange={(e) => setConfirm(readValue(e.target))}
             />
           )}
           {error && <p className="text-sm text-destructive">{error}</p>}

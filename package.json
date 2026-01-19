@@ -17,6 +17,7 @@
     "clsx": "^2.1.1",
     "dexie": "^4.0.8",
     "easy-currencies": "^1.0.6",
+    "file-saver": "^2.0.5",
     "lucide-react": "^0.476.0",
     "next": "16.1.3",
     "next-themes": "^0.3.0",
@@ -28,6 +29,7 @@
   },
   "devDependencies": {
     "@serwist/turbopack": "^9.5.0",
+    "@types/file-saver": "^2.0.7",
     "@types/node": "25.0.9",
     "@types/react": "19.2.8",
     "autoprefixer": "^10.4.18",

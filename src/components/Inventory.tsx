@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
+import { saveAs } from 'file-saver';
 import { Lock } from 'lucide-react';
 import {
   createPurchase,
@@ -19,7 +20,7 @@ import { getFxRate, getSpot, perGramFromOunce } from '../lib/prices';
 import { z } from 'zod';
 import ThemeToggle from './theme-toggle';
 import { getBrowserStorage, getDocument } from '../lib/utils';
-import { Button } from './ui/button';
+import { Button, buttonVariants } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
@@ -73,6 +74,15 @@ export default function Inventory({
     link: '',
     imageDataUrl: '',
   });
+
+  function readValue(target: EventTarget | null) {
+    const value = (target as { value?: string } | null)?.value;
+    return typeof value === 'string' ? value : '';
+  }
+
+  function readChecked(target: EventTarget | null) {
+    return Boolean((target as { checked?: boolean } | null)?.checked);
+  }
 
   async function refreshSafes(selectFirstIfNeeded = true) {
     const s = await listSafes(keyMaterial);
@@ -265,51 +275,37 @@ export default function Inventory({
   async function onExport() {
     const data = await exportAllDecrypted(keyMaterial);
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const doc = getDocument();
-    if (!doc) return;
-    const a = doc.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `aurasafe-export-${new Date().toISOString().slice(0, 19)}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    saveAs(blob, `aurasafe-export-${new Date().toISOString().slice(0, 19)}.json`);
   }
 
-  async function onImport() {
-    const doc = getDocument();
-    if (!doc) return;
-    const input = doc.createElement('input');
-    input.type = 'file';
-    input.accept = 'application/json';
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      const text = await file.text();
-      const schema = z.object({
-        safes: z.array(
-          z.object({ id: z.string().uuid(), name: z.string(), isDefault: z.boolean().optional() }),
-        ),
-        purchases: z.array(
-          z.object({
-            id: z.string().uuid(),
-            safeId: z.string().uuid(),
-            name: z.string(),
-            metal: z.string().optional(),
-            date: z.string(),
-            type: z.string(),
-            weight: z.number(),
-            buyPrice: z.number(),
-            currency: z.string(),
-            notes: z.string().optional(),
-            link: z.string().url().optional(),
-            imageDataUrl: z.string().optional(),
-          }),
-        ),
-      });
-      const parsed = schema.parse(JSON.parse(text));
-      setPendingImportData(parsed);
-      setIsImportConfirmOpen(true);
-    };
-    input.click();
+  async function onImportFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const target = e.target as unknown as { files?: FileList | null; value?: string };
+    const file = target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const schema = z.object({
+      safes: z.array(z.object({ id: z.string().uuid(), name: z.string(), isDefault: z.boolean().optional() })),
+      purchases: z.array(
+        z.object({
+          id: z.string().uuid(),
+          safeId: z.string().uuid(),
+          name: z.string(),
+          metal: z.string().optional(),
+          date: z.string(),
+          type: z.string(),
+          weight: z.number(),
+          buyPrice: z.number(),
+          currency: z.string(),
+          notes: z.string().optional(),
+          link: z.string().url().optional(),
+          imageDataUrl: z.string().optional(),
+        }),
+      ),
+    });
+    const parsed = schema.parse(JSON.parse(text));
+    setPendingImportData(parsed);
+    setIsImportConfirmOpen(true);
+    if (typeof target.value === 'string') target.value = '';
   }
 
   async function confirmImport() {
@@ -364,7 +360,8 @@ export default function Inventory({
   }
 
   async function onEditImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.currentTarget.files?.[0];
+    const target = e.target as unknown as { files?: FileList | null };
+    const file = target.files?.[0];
     if (!file) return;
     const dataUrl = await resizeImageToDataUrl(file, 180);
     if (dataUrl) setEditForm((prev) => ({ ...prev, imageDataUrl: dataUrl }));
@@ -497,6 +494,13 @@ export default function Inventory({
 
   return (
     <div className="mx-auto max-w-4xl p-4">
+      <input
+        id="import-input"
+        type="file"
+        accept="application/json"
+        onChange={onImportFileChange}
+        className="hidden"
+      />
       <header className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img src="/aurasafe-logo.png" alt="AuraSafe" className="h-8 w-8" />
@@ -510,9 +514,9 @@ export default function Inventory({
           <Button variant="outline" onClick={onExport}>
             Export
           </Button>
-          <Button variant="outline" onClick={onImport}>
+          <label htmlFor="import-input" className={buttonVariants({ variant: 'outline' })}>
             Import
-          </Button>
+          </label>
         </div>
       </header>
 
@@ -523,7 +527,7 @@ export default function Inventory({
             <Label>Safe</Label>
             <select
               value={currentSafe ?? ''}
-              onChange={(e) => setCurrentSafe(e.target.value)}
+              onChange={(e) => setCurrentSafe(readValue(e.target))}
               className="h-10 rounded-md border border-input bg-background px-3 text-sm"
             >
               {safes.map((safe) => (
@@ -537,7 +541,10 @@ export default function Inventory({
             <Label>Currency</Label>
             <select
               value={currency}
-              onChange={(e) => setCurrency(e.target.value as 'USD' | 'EUR')}
+              onChange={(e) => {
+                const value = readValue(e.target);
+                if (value === 'USD' || value === 'EUR') setCurrency(value);
+              }}
               className="h-10 rounded-md border border-input bg-background px-3 text-sm"
             >
               <option value="USD">USD</option>
@@ -634,13 +641,13 @@ export default function Inventory({
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <Input
             value={assetSearch}
-            onChange={(e) => setAssetSearch(e.target.value)}
+            onChange={(e) => setAssetSearch(readValue(e.target))}
             placeholder="Search name or notes"
             className="min-w-[220px] flex-1"
           />
           <select
             value={assetTypeFilter}
-            onChange={(e) => setAssetTypeFilter(e.target.value)}
+            onChange={(e) => setAssetTypeFilter(readValue(e.target))}
             className="h-10 rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value="All">All</option>
@@ -650,7 +657,7 @@ export default function Inventory({
           </select>
           <select
             value={assetSort}
-            onChange={(e) => setAssetSort(e.target.value)}
+            onChange={(e) => setAssetSort(readValue(e.target))}
             className="h-10 rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value="date-desc">Date (newest)</option>
@@ -820,7 +827,7 @@ export default function Inventory({
               <Label>Name</Label>
               <Input
                 value={editForm.name}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, name: readValue(e.target) }))}
                 placeholder="Name"
               />
             </div>
@@ -828,7 +835,7 @@ export default function Inventory({
               <Label>Date</Label>
               <Input
                 value={editForm.date}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, date: e.target.value }))}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, date: readValue(e.target) }))}
                 type="date"
               />
             </div>
@@ -836,7 +843,7 @@ export default function Inventory({
               <Label>Metal</Label>
               <select
                 value={editForm.metal}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, metal: e.target.value }))}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, metal: readValue(e.target) }))}
                 className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               >
                 <option>Gold</option>
@@ -847,7 +854,7 @@ export default function Inventory({
               <Label>Type</Label>
               <select
                 value={editForm.type}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, type: e.target.value }))}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, type: readValue(e.target) }))}
                 className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               >
                 <option>Coin</option>
@@ -859,7 +866,7 @@ export default function Inventory({
               <Label>Weight (g)</Label>
               <Input
                 value={editForm.weight}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, weight: e.target.value }))}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, weight: readValue(e.target) }))}
                 type="number"
                 step="0.0001"
                 min="0.0001"
@@ -869,7 +876,7 @@ export default function Inventory({
               <Label>Buy Price</Label>
               <Input
                 value={editForm.buyPrice}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, buyPrice: e.target.value }))}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, buyPrice: readValue(e.target) }))}
                 type="number"
                 step="0.01"
                 min="0.01"
@@ -881,7 +888,7 @@ export default function Inventory({
               <Label>Currency</Label>
               <select
                 value={editForm.currency}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, currency: e.target.value }))}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, currency: readValue(e.target) }))}
                 className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               >
                 <option value="USD">USD</option>
@@ -893,7 +900,7 @@ export default function Inventory({
                 id="gifted"
                 type="checkbox"
                 checked={editForm.isGift}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, isGift: e.target.checked }))}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, isGift: readChecked(e.target) }))}
                 className="h-4 w-4 rounded border border-input"
               />
               <Label htmlFor="gifted">Gifted / no purchase price</Label>
@@ -902,7 +909,7 @@ export default function Inventory({
               <Label>Notes</Label>
               <Input
                 value={editForm.notes}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, notes: readValue(e.target) }))}
                 placeholder="Notes"
               />
             </div>
@@ -910,7 +917,7 @@ export default function Inventory({
               <Label>Product link</Label>
               <Input
                 value={editForm.link}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, link: e.target.value }))}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, link: readValue(e.target) }))}
                 type="url"
                 placeholder="Product link"
               />
@@ -953,7 +960,7 @@ export default function Inventory({
           )}
           <div className="space-y-2">
             <Label>Safe name</Label>
-            <Input value={safeName} onChange={(e) => setSafeName(e.target.value)} placeholder="Safe name" />
+            <Input value={safeName} onChange={(e) => setSafeName(readValue(e.target))} placeholder="Safe name" />
           </div>
           <DialogFooter className="pt-4">
             <Button variant="outline" onClick={() => setIsSafeModalOpen(false)}>
