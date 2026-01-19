@@ -1,3 +1,5 @@
+import { getBrowserStorage } from './utils';
+
 export function bytesToBase64(bytes: Uint8Array): string {
   let binary = '';
   const len = bytes.byteLength;
@@ -16,12 +18,13 @@ const te = new TextEncoder();
 const td = new TextDecoder();
 
 export function getOrCreateSalt(): string {
-  let salt = localStorage.getItem('as_salt');
+  const storage = getBrowserStorage();
+  let salt = storage?.getItem('as_salt') ?? null;
   if (!salt) {
     const buf = new Uint8Array(16);
     crypto.getRandomValues(buf);
     salt = bytesToBase64(buf);
-    localStorage.setItem('as_salt', salt);
+    storage?.setItem('as_salt', salt);
   }
   return salt;
 }
@@ -52,11 +55,13 @@ export async function hashPin(pin: string, saltB64: string): Promise<string> {
 }
 
 export function getStoredHash(): string | null {
-  return typeof window === 'undefined' ? null : localStorage.getItem('as_master_hash');
+  const storage = getBrowserStorage();
+  return storage?.getItem('as_master_hash') ?? null;
 }
 
 export function setStoredHash(hash: string) {
-  localStorage.setItem('as_master_hash', hash);
+  const storage = getBrowserStorage();
+  storage?.setItem('as_master_hash', hash);
 }
 
 function makeIV(): Uint8Array {

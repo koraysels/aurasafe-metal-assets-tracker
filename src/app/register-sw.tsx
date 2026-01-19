@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { getLocation, getNavigator } from '../lib/utils';
 
 export default function RegisterSW() {
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
@@ -7,15 +8,18 @@ export default function RegisterSW() {
 
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production') return;
-    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+    const nav = getNavigator();
+    if (!nav || !('serviceWorker' in nav)) return;
+    const serviceWorker = nav.serviceWorker as ServiceWorkerContainer | undefined;
+    if (!serviceWorker) return;
 
     const onControllerChange = () => {
-      window.location.reload();
+      getLocation()?.reload();
     };
 
-    navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+    serviceWorker.addEventListener('controllerchange', onControllerChange);
 
-    navigator.serviceWorker
+    serviceWorker
       .getRegistrations()
       .then((registrations) => {
         const registration = registrations.find((reg) =>
@@ -37,7 +41,7 @@ export default function RegisterSW() {
           const newWorker = registration.installing;
           if (!newWorker) return;
           newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            if (newWorker.state === 'installed' && serviceWorker.controller) {
               onWaiting(registration.waiting);
             }
           });
@@ -46,7 +50,7 @@ export default function RegisterSW() {
       .catch(() => {});
 
     return () => {
-      navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+      serviceWorker.removeEventListener('controllerchange', onControllerChange);
     };
   }, []);
 

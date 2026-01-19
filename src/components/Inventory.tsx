@@ -18,6 +18,7 @@ import {
 import { getFxRate, getSpot, perGramFromOunce } from '../lib/prices';
 import { z } from 'zod';
 import ThemeToggle from './theme-toggle';
+import { getBrowserStorage, getDocument } from '../lib/utils';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
@@ -44,8 +45,16 @@ export default function Inventory({
   const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
   const [isSafeModalOpen, setIsSafeModalOpen] = useState(false);
+  const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
   const [safeModalMode, setSafeModalMode] = useState<'create' | 'rename'>('create');
   const [safeName, setSafeName] = useState('');
+  const [safeError, setSafeError] = useState('');
+  const [assetError, setAssetError] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
+  const [pendingImportData, setPendingImportData] = useState<{
+    safes: Safe[];
+    purchases: Purchase[];
+  } | null>(null);
   const [lastAssetDefaults, setLastAssetDefaults] = useState({
     type: 'Coin',
     currency: 'USD',
@@ -101,9 +110,10 @@ export default function Inventory({
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    const storage = getBrowserStorage();
+    if (!storage) return;
     if (!currentSafe) return;
-    const stored = localStorage.getItem(`as_currency_${currentSafe}`);
+    const stored = storage.getItem(`as_currency_${currentSafe}`);
     if (stored === 'USD' || stored === 'EUR') {
       setCurrency(stored);
     }
@@ -119,8 +129,9 @@ export default function Inventory({
         console.error(error);
       }
     })();
-    if (typeof window !== 'undefined' && currentSafe) {
-      localStorage.setItem(`as_currency_${currentSafe}`, currency);
+    if (currentSafe) {
+      const storage = getBrowserStorage();
+      storage?.setItem(`as_currency_${currentSafe}`, currency);
     }
   }, [currency, currentSafe]);
 
@@ -149,6 +160,7 @@ export default function Inventory({
   async function addSafe() {
     setSafeModalMode('create');
     setSafeName('');
+    setSafeError('');
     setIsSafeModalOpen(true);
   }
 
@@ -157,13 +169,14 @@ export default function Inventory({
     const existing = safes.find((safe) => safe.id === currentSafe);
     setSafeModalMode('rename');
     setSafeName(existing?.name ?? '');
+    setSafeError('');
     setIsSafeModalOpen(true);
   }
 
   async function saveSafe() {
     const name = safeName.trim();
     if (!name) {
-      alert('Please provide a safe name.');
+      setSafeError('Please provide a safe name.');
       return;
     }
     if (safeModalMode === 'create') {
@@ -173,6 +186,7 @@ export default function Inventory({
       if (existing) await upsertSafe(keyMaterial, { ...existing, name });
     }
     setIsSafeModalOpen(false);
+    setSafeError('');
     await refreshSafes(false);
   }
 
@@ -251,7 +265,9 @@ export default function Inventory({
   async function onExport() {
     const data = await exportAllDecrypted(keyMaterial);
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
+    const doc = getDocument();
+    if (!doc) return;
+    const a = doc.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `aurasafe-export-${new Date().toISOString().slice(0, 19)}.json`;
     a.click();
@@ -259,7 +275,9 @@ export default function Inventory({
   }
 
   async function onImport() {
-    const input = document.createElement('input');
+    const doc = getDocument();
+    if (!doc) return;
+    const input = doc.createElement('input');
     input.type = 'file';
     input.accept = 'application/json';
     input.onchange = async () => {
@@ -288,13 +306,20 @@ export default function Inventory({
         ),
       });
       const parsed = schema.parse(JSON.parse(text));
-      if (!confirm('This will overwrite your local data. Continue?')) return;
-      await importFromJSON(keyMaterial, parsed);
-      await refreshSafes();
-      if (currentSafe) await refreshPurchases(currentSafe);
-      alert('Import complete');
+      setPendingImportData(parsed);
+      setIsImportConfirmOpen(true);
     };
     input.click();
+  }
+
+  async function confirmImport() {
+    if (!pendingImportData) return;
+    await importFromJSON(keyMaterial, pendingImportData);
+    await refreshSafes();
+    if (currentSafe) await refreshPurchases(currentSafe);
+    setIsImportConfirmOpen(false);
+    setPendingImportData(null);
+    setStatusMessage('Import complete.');
   }
 
   async function removePurchaseImage(purchase: Purchase) {
@@ -348,21 +373,21 @@ export default function Inventory({
   async function saveEdit() {
     const safeId = await ensureSafeSelected();
     if (!safeId) {
-      alert('Please select a safe before saving.');
+      setAssetError('Please select a safe before saving.');
       return;
     }
     const nextWeight = Number(editForm.weight);
     const nextPrice = editForm.isGift ? 0 : Number(editForm.buyPrice);
     if (!editForm.name.trim()) {
-      alert('Please provide a purchase name.');
+      setAssetError('Please provide a purchase name.');
       return;
     }
     if (!Number.isFinite(nextWeight) || nextWeight <= 0) {
-      alert('Weight must be greater than 0.');
+      setAssetError('Weight must be greater than 0.');
       return;
     }
     if (!editForm.isGift && (!Number.isFinite(nextPrice) || nextPrice <= 0)) {
-      alert('Buy price must be greater than 0.');
+      setAssetError('Buy price must be greater than 0.');
       return;
     }
     if (editingPurchase) {
@@ -401,6 +426,7 @@ export default function Inventory({
     });
     setEditingPurchase(null);
     setIsAssetModalOpen(false);
+    setAssetError('');
     await refreshPurchases(safeId);
   }
 
@@ -409,7 +435,9 @@ export default function Inventory({
     const scale = Math.min(maxSize / bitmap.width, maxSize / bitmap.height, 1);
     const width = Math.round(bitmap.width * scale);
     const height = Math.round(bitmap.height * scale);
-    const canvas = document.createElement('canvas');
+    const doc = getDocument();
+    if (!doc) return undefined;
+    const canvas = doc.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');

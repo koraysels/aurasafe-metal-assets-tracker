@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import PinOverlay from '../components/PinOverlay';
 import Inventory from '../components/Inventory';
+import { getSessionStorage } from '../lib/utils';
 import { deriveKeyFromPin, getOrCreateSalt, getStoredHash, hashPin, setStoredHash } from '../lib/crypto';
 
 const SESSION_PIN_KEY = 'as_session_pin';
@@ -13,12 +14,7 @@ export default function Page() {
   useEffect(() => {
     const hasHash = !!getStoredHash();
     setMode(hasHash ? 'unlock' : 'setup');
-    const sessionStorageSafe = (typeof globalThis === 'undefined'
-      ? undefined
-      : (globalThis as any).sessionStorage) as
-      | { getItem: (key: string) => string | null }
-      | undefined;
-    const sessionPin = sessionStorageSafe?.getItem(SESSION_PIN_KEY) ?? null;
+    const sessionPin = getSessionStorage()?.getItem(SESSION_PIN_KEY) ?? null;
     if (!sessionPin || !hasHash) return;
     (async () => {
       const salt = getOrCreateSalt();
@@ -35,11 +31,7 @@ export default function Page() {
     const salt = getOrCreateSalt();
     const existingHash = getStoredHash();
     const newHash = await hashPin(pin, salt);
-    const sessionStorageSafe = (typeof globalThis === 'undefined'
-      ? undefined
-      : (globalThis as any).sessionStorage) as
-      | { setItem: (key: string, value: string) => void }
-      | undefined;
+    const sessionStorageSafe = getSessionStorage();
     if (!existingHash) {
       setStoredHash(newHash);
       const key = await deriveKeyFromPin(pin, salt);
@@ -56,11 +48,7 @@ export default function Page() {
 
   function onLock() {
     setKeyMaterial(null);
-    const sessionStorageSafe = (typeof globalThis === 'undefined'
-      ? undefined
-      : (globalThis as any).sessionStorage) as
-      | { removeItem: (key: string) => void }
-      | undefined;
+    const sessionStorageSafe = getSessionStorage();
     sessionStorageSafe?.removeItem(SESSION_PIN_KEY);
   }
 
