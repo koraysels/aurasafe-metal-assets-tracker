@@ -31,6 +31,7 @@ export type InputLike = {
   accept: string;
   files: FileList | null;
   onchange: ((this: GlobalEventHandlers, ev: Event) => any) | null;
+  click: () => void;
 };
 
 export type CanvasLike = {

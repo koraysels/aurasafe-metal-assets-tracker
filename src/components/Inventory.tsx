@@ -268,9 +268,7 @@ export default function Inventory({
     const doc = getDocument();
     if (!doc) return;
     const a = doc.createElement('a');
-    // @ts-expect-error -- local DocumentLike shim doesn't expose full anchor typings.
     a.href = URL.createObjectURL(blob);
-    // @ts-expect-error -- local DocumentLike shim doesn't expose full anchor typings.
     a.download = `aurasafe-export-${new Date().toISOString().slice(0, 19)}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
@@ -366,7 +364,7 @@ export default function Inventory({
   }
 
   async function onEditImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const file = e.currentTarget.files?.[0];
     if (!file) return;
     const dataUrl = await resizeImageToDataUrl(file, 180);
     if (dataUrl) setEditForm((prev) => ({ ...prev, imageDataUrl: dataUrl }));
