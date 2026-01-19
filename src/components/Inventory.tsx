@@ -23,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { ScrollArea } from './ui/scroll-area';
 
 export default function Inventory({
   keyMaterial,
@@ -42,6 +43,9 @@ export default function Inventory({
   const [assetSort, setAssetSort] = useState('date-desc');
   const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
+  const [isSafeModalOpen, setIsSafeModalOpen] = useState(false);
+  const [safeModalMode, setSafeModalMode] = useState<'create' | 'rename'>('create');
+  const [safeName, setSafeName] = useState('');
   const [lastAssetDefaults, setLastAssetDefaults] = useState({
     type: 'Coin',
     currency: 'USD',
@@ -143,18 +147,32 @@ export default function Inventory({
   }, [currentSafe]);
 
   async function addSafe() {
-    const name = prompt('Safe name')?.trim();
-    if (!name) return;
-    await createSafe(keyMaterial, name, safes.length === 0);
-    await refreshSafes(false);
+    setSafeModalMode('create');
+    setSafeName('');
+    setIsSafeModalOpen(true);
   }
 
   async function renameSafe() {
     if (!currentSafe) return;
     const existing = safes.find((safe) => safe.id === currentSafe);
-    const name = prompt('Safe name', existing?.name ?? '')?.trim();
-    if (!name || !existing) return;
-    await upsertSafe(keyMaterial, { ...existing, name });
+    setSafeModalMode('rename');
+    setSafeName(existing?.name ?? '');
+    setIsSafeModalOpen(true);
+  }
+
+  async function saveSafe() {
+    const name = safeName.trim();
+    if (!name) {
+      alert('Please provide a safe name.');
+      return;
+    }
+    if (safeModalMode === 'create') {
+      await createSafe(keyMaterial, name, safes.length === 0);
+    } else if (currentSafe) {
+      const existing = safes.find((safe) => safe.id === currentSafe);
+      if (existing) await upsertSafe(keyMaterial, { ...existing, name });
+    }
+    setIsSafeModalOpen(false);
     await refreshSafes(false);
   }
 
@@ -614,8 +632,8 @@ export default function Inventory({
             <option value="profit-asc">Profit (low → high)</option>
           </select>
         </div>
-        <div className="max-h-[520px] overflow-y-auto pr-1">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <ScrollArea className="max-h-[520px]">
+          <div className="grid gap-3 pr-2">
             {assetItems.map(({ purchase: p, basis, currentValue, delta, rateValid }) => {
               const deltaPct = rateValid && basis > 0 ? (delta / basis) * 100 : 0;
               return (
@@ -728,7 +746,7 @@ export default function Inventory({
               </Card>
             )}
           </div>
-        </div>
+        </ScrollArea>
         </CardContent>
       </Card>
 
@@ -880,6 +898,24 @@ export default function Inventory({
               Cancel
             </Button>
             <Button onClick={saveEdit}>{editingPurchase ? 'Save' : 'Add'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isSafeModalOpen} onOpenChange={setIsSafeModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{safeModalMode === 'create' ? 'New Safe' : 'Rename Safe'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Safe name</Label>
+            <Input value={safeName} onChange={(e) => setSafeName(e.target.value)} placeholder="Safe name" />
+          </div>
+          <DialogFooter className="pt-4">
+            <Button variant="outline" onClick={() => setIsSafeModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={saveSafe}>{safeModalMode === 'create' ? 'Create' : 'Save'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
