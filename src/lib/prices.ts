@@ -121,10 +121,17 @@ export async function getHistoricalPrices(
   if (cached) return cached;
 
   try {
-    const resp = await fetch(
-      `https://goldbroker.com/api/historical-spot-prices?metal=${metalCode}&currency=${currency}&weight_unit=g`,
-      { cache: 'no-store' }
-    );
+    // Use Netlify function to bypass CORS
+    const isLocalhost =
+      typeof globalThis !== 'undefined' &&
+      typeof globalThis.location !== 'undefined' &&
+      globalThis.location.hostname === 'localhost';
+
+    const apiUrl = isLocalhost
+      ? `http://localhost:8888/.netlify/functions/historical-prices?metal=${metalCode}&currency=${currency}&weight_unit=g`
+      : `/.netlify/functions/historical-prices?metal=${metalCode}&currency=${currency}&weight_unit=g`;
+
+    const resp = await fetch(apiUrl, { cache: 'no-store' });
     const json = await resp.json();
 
     if (!json || !Array.isArray(json)) {
