@@ -528,7 +528,7 @@ export default function Inventory({
   }
 
   return (
-    <div className="mx-auto max-w-4xl p-4">
+    <div className="mx-auto flex min-h-screen max-w-4xl flex-col p-4">
       <input
         id="import-input"
         type="file"
@@ -536,20 +536,20 @@ export default function Inventory({
         onChange={onImportFileChange}
         className="hidden"
       />
-      <header className="mb-4 flex items-center justify-between">
+      <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <img src="/aurasafe-logo.png" alt="AuraSafe" className="h-8 w-8" />
           <h1 className="text-2xl font-semibold">AuraSafe</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <ThemeToggle />
           <Button variant="outline" size="icon" onClick={onLock} aria-label="Lock">
             <Lock className="h-4 w-4" />
           </Button>
-          <Button variant="outline" onClick={onExport}>
+          <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={onExport}>
             Export
           </Button>
-          <label htmlFor="import-input" className={buttonVariants({ variant: 'outline' })}>
+          <label htmlFor="import-input" className={buttonVariants({ variant: 'outline', size: 'sm', className: 'text-xs sm:text-sm' })}>
             Import
           </label>
         </div>
@@ -557,13 +557,13 @@ export default function Inventory({
 
       <Card className="mb-6">
         <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Label>Safe</Label>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <Label className="whitespace-nowrap">Safe</Label>
             <select
               value={currentSafe ?? ''}
               onChange={(e) => setCurrentSafe(readValue(e.target))}
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm sm:flex-initial"
             >
               {safes.map((safe) => (
                 <option key={safe.id} value={safe.id}>
@@ -572,8 +572,8 @@ export default function Inventory({
               ))}
             </select>
           </div>
-          <div className="flex items-center gap-2">
-            <Label>Currency</Label>
+          <div className="flex flex-wrap items-center gap-2">
+            <Label className="whitespace-nowrap">Currency</Label>
             <select
               value={currency}
               onChange={(e) => {
@@ -585,14 +585,15 @@ export default function Inventory({
               <option value="USD">USD</option>
               <option value="EUR">EUR</option>
             </select>
-            <Button onClick={addSafe}>New Safe</Button>
+            <Button size="sm" onClick={addSafe}>New Safe</Button>
             {currentSafe && (
-              <Button variant="outline" onClick={renameSafe}>
+              <Button size="sm" variant="outline" onClick={renameSafe}>
                 Rename
               </Button>
             )}
             {currentSafe && (
               <Button
+                size="sm"
                 variant="destructive"
                 onClick={async () => {
                   await deleteSafe(currentSafe);
@@ -608,24 +609,24 @@ export default function Inventory({
         </CardContent>
       </Card>
 
-      <section className="mb-6 grid gap-4 md:grid-cols-3">
+      <section className="mb-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3">
         <Card>
           <CardContent className="p-4">
           <div className="text-xs uppercase text-muted-foreground">Basis</div>
-          <div className="text-2xl font-semibold">{formatMoney(stats.totalBasis, currency)}</div>
+          <div className="text-xl font-semibold sm:text-2xl">{formatMoney(stats.totalBasis, currency)}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
           <div className="text-xs uppercase text-muted-foreground">Current Value</div>
-          <div className="text-2xl font-semibold">{formatMoney(stats.currentValue, currency)}</div>
+          <div className="text-xl font-semibold sm:text-2xl">{formatMoney(stats.currentValue, currency)}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="sm:col-span-2 md:col-span-1">
           <CardContent className="p-4">
           <div className="text-xs uppercase text-muted-foreground">Net</div>
           <div
-            className={`text-2xl font-semibold ${
+            className={`text-xl font-semibold sm:text-2xl ${
               stats.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'
             }`}
           >
@@ -660,22 +661,20 @@ export default function Inventory({
 
       <Card className="mb-6">
         <CardContent className="p-4 text-sm text-muted-foreground">
-          <div>
-            Gold spot: {formatMoney(spotByMetal.Gold?.price || 0, currency)}/oz •{' '}
-            {formatMoney(perGramFromOunce(spotByMetal.Gold?.price || 0), currency)}/g
+          <div className="mb-2">
+            <div className="font-medium">Gold spot: {formatMoney(spotByMetal.Gold?.price || 0, currency)}/oz • {formatMoney(perGramFromOunce(spotByMetal.Gold?.price || 0), currency)}/g</div>
             {spotByMetal.Gold?.timestamp && (
-              <span className="ml-2 text-[10px] text-muted-foreground">
-                (as of {new Date(spotByMetal.Gold.timestamp).toLocaleString()})
-              </span>
+              <div className="text-[10px] text-muted-foreground">
+                as of {new Date(spotByMetal.Gold.timestamp).toLocaleString()}
+              </div>
             )}
           </div>
           <div>
-            Silver spot: {formatMoney(spotByMetal.Silver?.price || 0, currency)}/oz •{' '}
-            {formatMoney(perGramFromOunce(spotByMetal.Silver?.price || 0), currency)}/g
+            <div className="font-medium">Silver spot: {formatMoney(spotByMetal.Silver?.price || 0, currency)}/oz • {formatMoney(perGramFromOunce(spotByMetal.Silver?.price || 0), currency)}/g</div>
             {spotByMetal.Silver?.timestamp && (
-              <span className="ml-2 text-[10px] text-muted-foreground">
-                (as of {new Date(spotByMetal.Silver.timestamp).toLocaleString()})
-              </span>
+              <div className="text-[10px] text-muted-foreground">
+                as of {new Date(spotByMetal.Silver.timestamp).toLocaleString()}
+              </div>
             )}
           </div>
         </CardContent>
@@ -1047,6 +1046,11 @@ export default function Inventory({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <footer className="mt-auto border-t border-border pt-6 pb-4 text-center text-xs text-muted-foreground">
+        <p>Made with ❤️ by Koray</p>
+        <p className="mt-1">© 2026 AuraSafe. All rights reserved.</p>
+      </footer>
     </div>
   );
 }
