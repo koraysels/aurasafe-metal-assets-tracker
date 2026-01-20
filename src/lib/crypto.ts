@@ -14,6 +14,10 @@ export function base64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
+function bytesToBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
 const te = new TextEncoder();
 const td = new TextDecoder();
 
@@ -35,8 +39,9 @@ async function importPBKDF2Key(pin: string) {
 
 export async function deriveKeyFromPin(pin: string, saltB64: string): Promise<CryptoKey> {
   const baseKey = await importPBKDF2Key(pin);
+  const salt = bytesToBuffer(base64ToBytes(saltB64));
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt: base64ToBytes(saltB64), iterations: 150000, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations: 150000, hash: 'SHA-256' },
     baseKey,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -46,8 +51,9 @@ export async function deriveKeyFromPin(pin: string, saltB64: string): Promise<Cr
 
 export async function hashPin(pin: string, saltB64: string): Promise<string> {
   const baseKey = await importPBKDF2Key(pin);
+  const salt = bytesToBuffer(base64ToBytes(saltB64));
   const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt: base64ToBytes(saltB64), iterations: 150000, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations: 150000, hash: 'SHA-256' },
     baseKey,
     256
   );
