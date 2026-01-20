@@ -22,14 +22,26 @@ async function setCachedJson(key: string, data: unknown, source: string) {
   });
 }
 
-export async function getSpot(metal: 'Gold' | 'Silver' | string, currency = 'USD', forceRefresh = false): Promise<number> {
+export type SpotPriceData = {
+  price: number;
+  timestamp: number;
+  source: string;
+};
+
+export async function getSpot(metal: 'Gold' | 'Silver' | string, currency = 'USD', forceRefresh = false): Promise<SpotPriceData> {
   const normalized = currency.toUpperCase();
   const metalKey = (metal || 'Gold').toLowerCase();
   const asset = metalKey === 'silver' ? 'XAG' : 'PAXG';
   const cacheKey = `current_${asset}_${normalized}`;
   const cached = await db.priceCache.get(cacheKey);
   const fiveMin = 5 * 60 * 1000;
-  if (!forceRefresh && cached && Date.now() - cached.timestamp < fiveMin) return cached.price;
+  if (!forceRefresh && cached && Date.now() - cached.timestamp < fiveMin) {
+    return {
+      price: cached.price,
+      timestamp: cached.timestamp,
+      source: cached.source,
+    };
+  }
 
   try {
     const resp = await fetch(`https://api.coinbase.com/v2/prices/${asset}-${normalized}/spot`, {
@@ -39,16 +51,29 @@ export async function getSpot(metal: 'Gold' | 'Silver' | string, currency = 'USD
     const amount = Number(json?.data?.amount);
     if (!isFinite(amount) || amount <= 0) throw new Error('Bad price');
     const price = amount;
+    const timestamp = Date.now();
+    const source = `Coinbase-${asset}-${normalized}`;
     await db.priceCache.put({
       id: cacheKey,
       price,
-      timestamp: Date.now(),
-      source: `Coinbase-${asset}-${normalized}`,
+      timestamp,
+      source,
     });
-    return price;
+    return { price, timestamp, source };
   } catch (e) {
-    if (cached) return cached.price;
-    return metalKey === 'silver' ? 25 : 1900;
+    if (cached) {
+      return {
+        price: cached.price,
+        timestamp: cached.timestamp,
+        source: cached.source,
+      };
+    }
+    const fallbackPrice = metalKey === 'silver' ? 25 : 1900;
+    return {
+      price: fallbackPrice,
+      timestamp: Date.now(),
+      source: 'Fallback',
+    };
   }
 }
 

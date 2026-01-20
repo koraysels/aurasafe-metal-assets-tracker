@@ -16,7 +16,7 @@ import {
   upsertPurchase,
   upsertSafe,
 } from '../lib/db';
-import { getFxRate, getSpot, perGramFromOunce } from '../lib/prices';
+import { getFxRate, getSpot, perGramFromOunce, SpotPriceData } from '../lib/prices';
 import { z } from 'zod';
 import ThemeToggle from './theme-toggle';
 import { getBrowserStorage, getDocument } from '../lib/utils';
@@ -37,7 +37,10 @@ export default function Inventory({
   const [safes, setSafes] = useState<Safe[]>([]);
   const [currentSafe, setCurrentSafe] = useState<string | null>(null);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
-  const [spotByMetal, setSpotByMetal] = useState<Record<string, number>>({ Gold: 0, Silver: 0 });
+  const [spotByMetal, setSpotByMetal] = useState<Record<string, SpotPriceData>>({
+    Gold: { price: 0, timestamp: Date.now(), source: '' },
+    Silver: { price: 0, timestamp: Date.now(), source: '' },
+  });
   const [currency, setCurrency] = useState<'USD' | 'EUR'>('USD');
   const [fxRates, setFxRates] = useState<Record<string, number>>({});
   const [assetSearch, setAssetSearch] = useState('');
@@ -212,17 +215,20 @@ export default function Inventory({
           return acc;
         }
         const metal = p.metal || 'Gold';
-        const metalSpot = spotByMetal[metal] ?? spotByMetal.Gold ?? 0;
+        const metalSpot = spotByMetal[metal]?.price ?? spotByMetal.Gold?.price ?? 0;
         acc.basis += hasPrice ? (p.buyPrice || 0) * (rateValid ? rate : 1) : 0;
         acc.current += perGramFromOunce(metalSpot) * (p.weight || 0);
         return acc;
       },
       { basis: 0, current: 0 },
     );
+    const netProfit = totals.current - totals.basis;
+    const profitPercent = totals.basis > 0 ? (netProfit / totals.basis) * 100 : 0;
     return {
       totalBasis: totals.basis,
       currentValue: totals.current,
-      netProfit: totals.current - totals.basis,
+      netProfit,
+      profitPercent,
       missingFx,
     };
   }, [purchases, spotByMetal, fxRates, currency]);
@@ -249,7 +255,7 @@ export default function Inventory({
       const appliedRate = p.currency === currency ? 1 : rate;
       const basis = rateValid ? (p.buyPrice || 0) * (appliedRate || 1) : 0;
       const metal = p.metal || 'Gold';
-      const metalSpot = spotByMetal[metal] ?? spotByMetal.Gold ?? 0;
+      const metalSpot = spotByMetal[metal]?.price ?? spotByMetal.Gold?.price ?? 0;
       const currentValue = perGramFromOunce(metalSpot) * (p.weight || 0);
       const delta = currentValue - basis;
       return { purchase: p, basis, currentValue, delta, rateValid };
@@ -606,6 +612,9 @@ export default function Inventory({
               )}
               <span>{formatMoney(stats.netProfit, currency)}</span>
             </span>
+            <div className="mt-1 text-sm font-normal text-muted-foreground">
+              {stats.profitPercent.toFixed(2)}%
+            </div>
           </div>
           </CardContent>
         </Card>
@@ -623,12 +632,22 @@ export default function Inventory({
       <Card className="mb-6">
         <CardContent className="p-4 text-sm text-muted-foreground">
           <div>
-            Gold spot: {formatMoney(spotByMetal.Gold || 0, currency)}/oz •{' '}
-            {formatMoney(perGramFromOunce(spotByMetal.Gold || 0), currency)}/g
+            Gold spot: {formatMoney(spotByMetal.Gold?.price || 0, currency)}/oz •{' '}
+            {formatMoney(perGramFromOunce(spotByMetal.Gold?.price || 0), currency)}/g
+            {spotByMetal.Gold?.timestamp && (
+              <span className="ml-2 text-[10px] text-muted-foreground">
+                (as of {new Date(spotByMetal.Gold.timestamp).toLocaleString()})
+              </span>
+            )}
           </div>
           <div>
-            Silver spot: {formatMoney(spotByMetal.Silver || 0, currency)}/oz •{' '}
-            {formatMoney(perGramFromOunce(spotByMetal.Silver || 0), currency)}/g
+            Silver spot: {formatMoney(spotByMetal.Silver?.price || 0, currency)}/oz •{' '}
+            {formatMoney(perGramFromOunce(spotByMetal.Silver?.price || 0), currency)}/g
+            {spotByMetal.Silver?.timestamp && (
+              <span className="ml-2 text-[10px] text-muted-foreground">
+                (as of {new Date(spotByMetal.Silver.timestamp).toLocaleString()})
+              </span>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -801,7 +820,7 @@ export default function Inventory({
       )}
 
       <footer className="mt-6 text-center text-xs text-gray-500">
-        Spot: {formatMoney(spotByMetal.Gold || 0, currency)}/oz • Cached offline
+        Spot: {formatMoney(spotByMetal.Gold?.price || 0, currency)}/oz • Cached offline
       </footer>
 
       <Dialog
