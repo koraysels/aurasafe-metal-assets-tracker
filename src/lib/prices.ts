@@ -117,6 +117,7 @@ export async function getHistoricalPrices(
   const metalCode = metal === 'Gold' ? 'XAU' : 'XAG';
   const cacheKey = `historical_${metalCode}_${currency}_${days}d`;
 
+  // Check cache first
   const cached = await getCachedJson<HistoricalPrice[]>(cacheKey, 24 * 60 * 60 * 1000);
   if (cached) return cached;
 
@@ -154,7 +155,36 @@ export async function getHistoricalPrices(
 
     return prices;
   } catch (e) {
-    console.error('Failed to fetch historical prices:', e);
+    console.error('Failed to fetch historical prices from API:', e);
+
+    // Try to load from local fallback JSON files
+    try {
+      const fallbackUrl = `/historical-prices-${metalCode.toLowerCase()}.json`;
+      const fallbackResp = await fetch(fallbackUrl);
+      const fallbackJson = await fallbackResp.json();
+
+      const items = fallbackJson?._embedded?.items;
+      if (!items || !Array.isArray(items)) {
+        throw new Error('Invalid fallback data');
+      }
+
+      const prices: HistoricalPrice[] = items
+        .slice(-days)
+        .map((item: any) => ({
+          date: item.date,
+          price: Number(item.close),
+        }))
+        .filter((item) => item.date && isFinite(item.price));
+
+      if (prices.length > 0) {
+        await setCachedJson(cacheKey, prices, `Fallback-${metalCode}`);
+        console.log(`Loaded ${prices.length} historical prices from fallback file`);
+        return prices;
+      }
+    } catch (fallbackError) {
+      console.error('Failed to load fallback historical prices:', fallbackError);
+    }
+
     return [];
   }
 }
