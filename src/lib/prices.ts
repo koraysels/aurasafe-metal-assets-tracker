@@ -103,3 +103,49 @@ export async function getFxRate(from: string, to: string) {
 export function perGramFromOunce(perOunce: number) {
   return perOunce / 31.1034768;
 }
+
+export type HistoricalPrice = {
+  date: string;
+  price: number;
+};
+
+export async function getHistoricalPrices(
+  metal: 'Gold' | 'Silver',
+  currency: string,
+  days: number = 90
+): Promise<HistoricalPrice[]> {
+  const metalCode = metal === 'Gold' ? 'XAU' : 'XAG';
+  const cacheKey = `historical_${metalCode}_${currency}_${days}d`;
+
+  const cached = await getCachedJson<HistoricalPrice[]>(cacheKey, 24 * 60 * 60 * 1000);
+  if (cached) return cached;
+
+  try {
+    const resp = await fetch(
+      `https://goldbroker.com/api/historical-spot-prices?metal=${metalCode}&currency=${currency}&weight_unit=g`,
+      { cache: 'no-store' }
+    );
+    const json = await resp.json();
+
+    if (!json || !Array.isArray(json)) {
+      throw new Error('Invalid response');
+    }
+
+    const prices: HistoricalPrice[] = json
+      .slice(-days)
+      .map((item: any) => ({
+        date: item.date,
+        price: Number(item.price),
+      }))
+      .filter((item) => item.date && isFinite(item.price));
+
+    if (prices.length > 0) {
+      await setCachedJson(cacheKey, prices, `GoldBroker-${metalCode}-${currency}`);
+    }
+
+    return prices;
+  } catch (e) {
+    console.error('Failed to fetch historical prices:', e);
+    return [];
+  }
+}

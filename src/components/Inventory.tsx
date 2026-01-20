@@ -16,10 +16,11 @@ import {
   upsertPurchase,
   upsertSafe,
 } from '../lib/db';
-import { getFxRate, getSpot, perGramFromOunce, SpotPriceData } from '../lib/prices';
+import { getFxRate, getSpot, perGramFromOunce, SpotPriceData, getHistoricalPrices, HistoricalPrice } from '../lib/prices';
 import { z } from 'zod';
 import ThemeToggle from './theme-toggle';
 import { getBrowserStorage, getDocument } from '../lib/utils';
+import ValueChart from './ValueChart';
 import { Button, buttonVariants } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
@@ -43,6 +44,10 @@ export default function Inventory({
   });
   const [currency, setCurrency] = useState<'USD' | 'EUR'>('USD');
   const [fxRates, setFxRates] = useState<Record<string, number>>({});
+  const [historicalPrices, setHistoricalPrices] = useState<{ gold: HistoricalPrice[]; silver: HistoricalPrice[] }>({
+    gold: [],
+    silver: [],
+  });
   const [assetSearch, setAssetSearch] = useState('');
   const [assetTypeFilter, setAssetTypeFilter] = useState('All');
   const [assetSort, setAssetSort] = useState('date-desc');
@@ -151,6 +156,21 @@ export default function Inventory({
   useEffect(() => {
     (async () => {
       try {
+        const [goldPrices, silverPrices] = await Promise.all([
+          getHistoricalPrices('Gold', currency, 90),
+          getHistoricalPrices('Silver', currency, 90),
+        ]);
+        setHistoricalPrices({ gold: goldPrices, silver: silverPrices });
+      } catch (error) {
+        console.error('Failed to fetch historical prices:', error);
+        setHistoricalPrices({ gold: [], silver: [] });
+      }
+    })();
+  }, [currency]);
+
+  useEffect(() => {
+    (async () => {
+      try {
         const currencies = Array.from(new Set(purchases.map((p) => p.currency || currency)));
         const entries = await Promise.all(
           currencies.map(async (cur) => [cur, await getFxRate(cur, currency)] as const),
@@ -205,6 +225,8 @@ export default function Inventory({
 
   const stats = useMemo(() => {
     let missingFx = 0;
+    let goldWeight = 0;
+    let silverWeight = 0;
     const totals = purchases.reduce(
       (acc, p) => {
         const hasPrice = (p.buyPrice || 0) > 0;
@@ -218,6 +240,11 @@ export default function Inventory({
         const metalSpot = spotByMetal[metal]?.price ?? spotByMetal.Gold?.price ?? 0;
         acc.basis += hasPrice ? (p.buyPrice || 0) * (rateValid ? rate : 1) : 0;
         acc.current += perGramFromOunce(metalSpot) * (p.weight || 0);
+        if (metal === 'Gold') {
+          goldWeight += p.weight || 0;
+        } else if (metal === 'Silver') {
+          silverWeight += p.weight || 0;
+        }
         return acc;
       },
       { basis: 0, current: 0 },
@@ -229,6 +256,8 @@ export default function Inventory({
       currentValue: totals.current,
       netProfit,
       profitPercent,
+      goldWeight,
+      silverWeight,
       missingFx,
     };
   }, [purchases, spotByMetal, fxRates, currency]);
@@ -649,6 +678,16 @@ export default function Inventory({
               </span>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <ValueChart
+            historicalPrices={historicalPrices}
+            totalWeight={stats.goldWeight}
+            currency={currency}
+          />
         </CardContent>
       </Card>
 
