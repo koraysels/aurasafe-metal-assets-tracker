@@ -1,11 +1,24 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useTheme } from 'next-themes';
+import ThemeToggle from './theme-toggle';
 
 export default function PinOverlay({ mode, onUnlock }: { mode: 'setup' | 'unlock'; onUnlock: (pin: string, confirmPin?: string) => Promise<void>; }) {
   const [pin, setPin] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme !== 'light';
+  const chartVars = useMemo(() => ({
+    ['--grid-strong' as string]: isDark ? 'rgba(148,163,184,0.18)' : 'rgba(15,23,42,0.12)',
+    ['--grid-soft' as string]: isDark ? 'rgba(148,163,184,0.04)' : 'rgba(15,23,42,0.04)',
+    ['--line-start' as string]: isDark ? 'rgba(52,211,153,0.0)' : 'rgba(16,185,129,0.0)',
+    ['--line-mid' as string]: isDark ? 'rgba(52,211,153,0.8)' : 'rgba(5,150,105,0.85)',
+    ['--line-end' as string]: isDark ? 'rgba(56,189,248,0.9)' : 'rgba(2,132,199,0.9)',
+    ['--line-alt' as string]: isDark ? 'rgba(56,189,248,0.35)' : 'rgba(2,132,199,0.35)',
+    ['--bg-tint' as string]: isDark ? 'rgba(2,6,23,0.2)' : 'rgba(226,232,240,0.45)',
+  }), [isDark]);
 
   function readValue(target: EventTarget | null) {
     const value = (target as { value?: string } | null)?.value;
@@ -35,11 +48,65 @@ export default function PinOverlay({ mode, onUnlock }: { mode: 'setup' | 'unlock
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm dark:bg-black/60">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-32 -top-24 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl dark:bg-emerald-500/10" />
+        <div className="absolute -bottom-24 -right-20 h-80 w-80 rounded-full bg-sky-400/20 blur-3xl dark:bg-blue-500/10" />
+        <svg
+          viewBox="0 0 1200 800"
+          className="absolute inset-0 h-full w-full opacity-40"
+          preserveAspectRatio="none"
+          style={chartVars as React.CSSProperties}
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id="grid" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="var(--grid-strong)" />
+              <stop offset="100%" stopColor="var(--grid-soft)" />
+            </linearGradient>
+            <linearGradient id="line" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0%" stopColor="var(--line-start)" />
+              <stop offset="40%" stopColor="var(--line-mid)" />
+              <stop offset="100%" stopColor="var(--line-end)" />
+            </linearGradient>
+          </defs>
+          <rect width="1200" height="800" fill="var(--bg-tint)" />
+          <g stroke="url(#grid)" strokeWidth="1">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <line key={`h-${i}`} x1="0" y1={i * 70} x2="1200" y2={i * 70} />
+            ))}
+            {Array.from({ length: 12 }).map((_, i) => (
+              <line key={`v-${i}`} x1={i * 100} y1="0" x2={i * 100} y2="800" />
+            ))}
+          </g>
+          <polyline
+            points="0,520 80,500 160,540 240,420 320,460 400,380 480,420 560,300 640,340 720,260 800,300 880,220 960,260 1040,210 1120,240 1200,180"
+            fill="none"
+            stroke="url(#line)"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeDasharray="8 10"
+          >
+            <animate attributeName="stroke-dashoffset" from="0" to="-180" dur="8s" repeatCount="indefinite" />
+          </polyline>
+          <polyline
+            points="0,610 100,580 200,640 300,520 400,560 500,500 600,540 700,460 800,520 900,420 1000,450 1100,380 1200,420"
+            fill="none"
+            stroke="var(--line-alt)"
+            strokeWidth="2"
+            strokeDasharray="6 12"
+          >
+            <animate attributeName="stroke-dashoffset" from="0" to="140" dur="10s" repeatCount="indefinite" />
+          </polyline>
+        </svg>
+      </div>
       <form
         onSubmit={submit}
-        className="w-full max-w-sm rounded-xl border border-border bg-card p-6 text-card-foreground shadow-xl"
+        className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-card p-6 text-card-foreground shadow-xl"
       >
+        <div className="absolute right-4 top-4">
+          <ThemeToggle />
+        </div>
         <div className="mb-4 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted">
             <img
