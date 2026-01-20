@@ -140,6 +140,9 @@ export default function PinOverlay({ mode, onUnlock }: { mode: 'setup' | 'unlock
             className="w-full rounded-md border border-input bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring"
             type="password"
             inputMode="numeric"
+            autoComplete="off"
+            data-lpignore="true"
+            data-1p-ignore="true"
             placeholder="PIN"
             value={pin}
             onChange={(e) => setPin(readValue(e.target))}
@@ -149,6 +152,9 @@ export default function PinOverlay({ mode, onUnlock }: { mode: 'setup' | 'unlock
               className="w-full rounded-md border border-input bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring"
               type="password"
               inputMode="numeric"
+              autoComplete="off"
+              data-lpignore="true"
+              data-1p-ignore="true"
               placeholder="Confirm PIN"
               value={confirm}
               onChange={(e) => setConfirm(readValue(e.target))}
