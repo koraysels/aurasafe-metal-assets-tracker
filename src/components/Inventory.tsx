@@ -51,6 +51,7 @@ export default function Inventory({
   const [assetSearch, setAssetSearch] = useState('');
   const [assetTypeFilter, setAssetTypeFilter] = useState('All');
   const [assetSort, setAssetSort] = useState('date-desc');
+  const [chartRange, setChartRange] = useState<'week' | 'month' | 'year' | 'all'>('month');
   const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
   const [isSafeModalOpen, setIsSafeModalOpen] = useState(false);
@@ -121,6 +122,12 @@ export default function Inventory({
     return safe.id;
   }
 
+  const firstPurchaseDate = useMemo(() => {
+    if (purchases.length === 0) return null;
+    const dates = purchases.map((p) => p.date).filter(Boolean).sort();
+    return dates[0] || null;
+  }, [purchases]);
+
   useEffect(() => {
     (async () => {
       await refreshSafes(true);
@@ -156,9 +163,19 @@ export default function Inventory({
   useEffect(() => {
     (async () => {
       try {
+        // Calculate days needed based on first purchase date
+        let daysToFetch = 365; // Default to 1 year
+        if (firstPurchaseDate) {
+          const firstDate = new Date(firstPurchaseDate);
+          const today = new Date();
+          const daysSinceFirst = Math.ceil((today.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24));
+          // Fetch enough data to cover from first purchase, with a buffer
+          daysToFetch = Math.max(365, daysSinceFirst + 30);
+        }
+
         const [goldPrices, silverPrices] = await Promise.all([
-          getHistoricalPrices('Gold', currency, 90),
-          getHistoricalPrices('Silver', currency, 90),
+          getHistoricalPrices('Gold', currency, daysToFetch),
+          getHistoricalPrices('Silver', currency, daysToFetch),
         ]);
         setHistoricalPrices({ gold: goldPrices, silver: silverPrices });
       } catch (error) {
@@ -166,7 +183,7 @@ export default function Inventory({
         setHistoricalPrices({ gold: [], silver: [] });
       }
     })();
-  }, [currency]);
+  }, [currency, firstPurchaseDate]);
 
   useEffect(() => {
     (async () => {
@@ -682,12 +699,45 @@ export default function Inventory({
 
       <Card className="mb-6">
         <CardContent className="p-4">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <Button
+              variant={chartRange === 'week' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setChartRange('week')}
+            >
+              Week
+            </Button>
+            <Button
+              variant={chartRange === 'month' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setChartRange('month')}
+            >
+              Month
+            </Button>
+            <Button
+              variant={chartRange === 'year' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setChartRange('year')}
+            >
+              Year
+            </Button>
+            <Button
+              variant={chartRange === 'all' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setChartRange('all')}
+              disabled={!firstPurchaseDate}
+            >
+              From Start
+            </Button>
+          </div>
           <ValueChart
             goldPrices={historicalPrices.gold}
             silverPrices={historicalPrices.silver}
             goldWeight={stats.goldWeight}
             silverWeight={stats.silverWeight}
             currency={currency}
+            range={chartRange}
+            firstPurchaseDate={firstPurchaseDate}
           />
         </CardContent>
       </Card>

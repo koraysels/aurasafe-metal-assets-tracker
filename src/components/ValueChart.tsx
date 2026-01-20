@@ -7,6 +7,8 @@ type ValueChartProps = {
   goldWeight: number;
   silverWeight: number;
   currency: string;
+  range: 'week' | 'month' | 'year' | 'all';
+  firstPurchaseDate: string | null;
 };
 
 export default function ValueChart({
@@ -15,6 +17,8 @@ export default function ValueChart({
   goldWeight,
   silverWeight,
   currency,
+  range,
+  firstPurchaseDate,
 }: ValueChartProps) {
   const hasData =
     (goldPrices.length > 0 && goldWeight > 0) || (silverPrices.length > 0 && silverWeight > 0);
@@ -27,12 +31,46 @@ export default function ValueChart({
     );
   }
 
+  // Calculate cutoff date string based on range
+  const now = new Date();
+  let cutoffDateStr: string | null = null;
+
+  if (range === 'week') {
+    const date = new Date(now);
+    date.setDate(date.getDate() - 7);
+    cutoffDateStr = date.toISOString().split('T')[0];
+  } else if (range === 'month') {
+    const date = new Date(now);
+    date.setMonth(date.getMonth() - 1);
+    cutoffDateStr = date.toISOString().split('T')[0];
+  } else if (range === 'year') {
+    const date = new Date(now);
+    date.setFullYear(date.getFullYear() - 1);
+    cutoffDateStr = date.toISOString().split('T')[0];
+  } else if (range === 'all' && firstPurchaseDate) {
+    cutoffDateStr = firstPurchaseDate;
+  }
+
   // Create a map of dates to prices for both metals
   const goldMap = new Map(goldPrices.map((p) => [p.date, p.price]));
   const silverMap = new Map(silverPrices.map((p) => [p.date, p.price]));
 
   // Get all unique dates and sort them
-  const allDates = Array.from(new Set([...goldPrices.map((p) => p.date), ...silverPrices.map((p) => p.date)])).sort();
+  let allDates = Array.from(new Set([...goldPrices.map((p) => p.date), ...silverPrices.map((p) => p.date)])).sort();
+
+  // Filter dates based on range
+  if (cutoffDateStr) {
+    allDates = allDates.filter((date) => date >= cutoffDateStr);
+  }
+
+  // Check if we have data after filtering
+  if (allDates.length === 0) {
+    return (
+      <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-muted-foreground/25 text-sm text-muted-foreground">
+        No data available for this time range
+      </div>
+    );
+  }
 
   // Combine data for both metals
   const data = allDates.map((date) => {
@@ -72,10 +110,20 @@ export default function ValueChart({
     );
   };
 
+  const getRangeLabel = () => {
+    if (range === 'week') return '7 Day History';
+    if (range === 'month') return '30 Day History';
+    if (range === 'year') return '1 Year History';
+    if (range === 'all' && firstPurchaseDate) {
+      return `Since ${new Date(firstPurchaseDate).toLocaleDateString()}`;
+    }
+    return `${data.length} Day History`;
+  };
+
   return (
     <div>
       <div className="mb-3 flex items-baseline justify-between">
-        <div className="text-xs uppercase text-muted-foreground">{data.length} Day History</div>
+        <div className="text-xs uppercase text-muted-foreground">{getRangeLabel()}</div>
         <div className={`text-sm font-semibold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
           {isPositive ? '+' : ''}
           {changePercent.toFixed(2)}%
