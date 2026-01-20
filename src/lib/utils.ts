@@ -5,57 +5,32 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function getBrowserStorage(): Storage | null {
-  if (typeof globalThis === 'undefined') return null;
-  return (globalThis as any).localStorage as Storage | null;
+declare const window: any;
+declare const document: any;
+declare const navigator: any;
+declare const location: any;
+
+export function getBrowserStorage() {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage;
 }
 
-export function getSessionStorage(): Storage | null {
-  if (typeof globalThis === 'undefined') return null;
-  return (globalThis as any).sessionStorage as Storage | null;
+export function getSessionStorage() {
+  if (typeof window === 'undefined') return null;
+  return window.sessionStorage;
 }
 
-export function getNavigator(): Navigator | null {
-  if (typeof globalThis === 'undefined') return null;
-  return (globalThis as any).navigator as Navigator | null;
+export function getNavigator() {
+  if (typeof window === 'undefined') return null;
+  return navigator;
 }
 
-export type AnchorLike = {
-  href: string;
-  download: string;
-  click: () => void;
-};
-
-export type InputLike = {
-  type: string;
-  accept: string;
-  files: FileList | null;
-  onchange: ((ev: Event) => any) | null;
-  click: () => void;
-};
-
-export type CanvasLike = {
-  width: number;
-  height: number;
-  getContext: (contextId: '2d') => any;
-  toDataURL: (type?: string, quality?: number) => string;
-};
-
-export type DocumentLike = {
-  createElement: {
-    (tagName: 'a'): AnchorLike;
-    (tagName: 'canvas'): CanvasLike;
-    (tagName: 'input'): InputLike;
-    (tagName: string): HTMLElement;
-  };
-};
-
-export function getDocument(): DocumentLike | null {
-  if (typeof globalThis === 'undefined') return null;
-  return (globalThis as any).document as DocumentLike | null;
+export function getDocument() {
+  if (typeof window === 'undefined') return null;
+  return document;
 }
 
-export function getLocation(): any {
-  if (typeof globalThis === 'undefined') return null;
-  return (globalThis as any).location;
+export function getLocation() {
+  if (typeof window === 'undefined') return null;
+  return location;
 }
