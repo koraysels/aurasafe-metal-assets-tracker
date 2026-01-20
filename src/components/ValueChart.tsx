@@ -1,5 +1,5 @@
 'use client';
-import { LineChart, Line, ResponsiveContainer, Tooltip, YAxis } from 'recharts';
+import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 type ValueChartProps = {
   goldPrices: Array<{ date: string; price: number }>;
@@ -120,6 +120,17 @@ export default function ValueChart({
     return `${data.length} Day History`;
   };
 
+  const formatDateLabel = (dateStr: string) => {
+    const date = new Date(dateStr);
+    if (range === 'week' || range === 'month') {
+      return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date);
+    }
+    if (range === 'year') {
+      return new Intl.DateTimeFormat('en-US', { month: 'short' }).format(date);
+    }
+    return new Intl.DateTimeFormat('en-US', { month: 'short', year: '2-digit' }).format(date);
+  };
+
   return (
     <div>
       <div className="mb-3 flex items-baseline justify-between">
@@ -130,8 +141,16 @@ export default function ValueChart({
         </div>
       </div>
       <div className="h-48 w-full">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={192}>
           <LineChart data={data} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+            <XAxis
+              dataKey="date"
+              tickFormatter={formatDateLabel}
+              tick={{ fontSize: 10, fill: 'rgb(148, 163, 184)' }}
+              axisLine={false}
+              tickLine={false}
+              minTickGap={12}
+            />
             <YAxis domain={['dataMin - 100', 'dataMax + 100']} hide />
             <Tooltip content={<CustomTooltip />} />
             <Line
