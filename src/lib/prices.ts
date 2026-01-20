@@ -134,15 +134,17 @@ export async function getHistoricalPrices(
     const resp = await fetch(apiUrl, { cache: 'no-store' });
     const json = await resp.json();
 
-    if (!json || !Array.isArray(json)) {
+    // API returns { _embedded: { items: [...] } } structure
+    const items = json?._embedded?.items;
+    if (!items || !Array.isArray(items)) {
       throw new Error('Invalid response');
     }
 
-    const prices: HistoricalPrice[] = json
+    const prices: HistoricalPrice[] = items
       .slice(-days)
       .map((item: any) => ({
         date: item.date,
-        price: Number(item.price),
+        price: Number(item.close), // Use 'close' price from API
       }))
       .filter((item) => item.date && isFinite(item.price));
 
