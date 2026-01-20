@@ -684,8 +684,10 @@ export default function Inventory({
       <Card className="mb-6">
         <CardContent className="p-4">
           <ValueChart
-            historicalPrices={historicalPrices}
-            totalWeight={stats.goldWeight}
+            goldPrices={historicalPrices.gold}
+            silverPrices={historicalPrices.silver}
+            goldWeight={stats.goldWeight}
+            silverWeight={stats.silverWeight}
             currency={currency}
           />
         </CardContent>

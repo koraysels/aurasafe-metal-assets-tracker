@@ -2,13 +2,24 @@
 import { LineChart, Line, ResponsiveContainer, Tooltip, YAxis } from 'recharts';
 
 type ValueChartProps = {
-  historicalPrices: Array<{ date: string; price: number }>;
-  totalWeight: number;
+  goldPrices: Array<{ date: string; price: number }>;
+  silverPrices: Array<{ date: string; price: number }>;
+  goldWeight: number;
+  silverWeight: number;
   currency: string;
 };
 
-export default function ValueChart({ historicalPrices, totalWeight, currency }: ValueChartProps) {
-  if (!historicalPrices || historicalPrices.length === 0 || totalWeight === 0) {
+export default function ValueChart({
+  goldPrices,
+  silverPrices,
+  goldWeight,
+  silverWeight,
+  currency,
+}: ValueChartProps) {
+  const hasData =
+    (goldPrices.length > 0 && goldWeight > 0) || (silverPrices.length > 0 && silverWeight > 0);
+
+  if (!hasData) {
     return (
       <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-muted-foreground/25 text-sm text-muted-foreground">
         No historical data available
@@ -16,10 +27,24 @@ export default function ValueChart({ historicalPrices, totalWeight, currency }: 
     );
   }
 
-  const data = historicalPrices.map((p) => ({
-    date: p.date,
-    value: p.price * totalWeight,
-  }));
+  // Create a map of dates to prices for both metals
+  const goldMap = new Map(goldPrices.map((p) => [p.date, p.price]));
+  const silverMap = new Map(silverPrices.map((p) => [p.date, p.price]));
+
+  // Get all unique dates and sort them
+  const allDates = Array.from(new Set([...goldPrices.map((p) => p.date), ...silverPrices.map((p) => p.date)])).sort();
+
+  // Combine data for both metals
+  const data = allDates.map((date) => {
+    const goldPrice = goldMap.get(date) || 0;
+    const silverPrice = silverMap.get(date) || 0;
+    const totalValue = goldPrice * goldWeight + silverPrice * silverWeight;
+
+    return {
+      date,
+      value: totalValue,
+    };
+  });
 
   const firstValue = data[0]?.value || 0;
   const lastValue = data[data.length - 1]?.value || 0;
@@ -50,7 +75,7 @@ export default function ValueChart({ historicalPrices, totalWeight, currency }: 
   return (
     <div>
       <div className="mb-3 flex items-baseline justify-between">
-        <div className="text-xs uppercase text-muted-foreground">{historicalPrices.length} Day History</div>
+        <div className="text-xs uppercase text-muted-foreground">{data.length} Day History</div>
         <div className={`text-sm font-semibold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
           {isPositive ? '+' : ''}
           {changePercent.toFixed(2)}%
