@@ -79,13 +79,13 @@ function makeIV(): Uint8Array {
 export async function encryptJSON(key: CryptoKey, obj: any): Promise<{ iv: string; ciphertext: string }> {
   const iv = makeIV();
   const plaintext = te.encode(JSON.stringify(obj));
-  const buf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext);
+  const buf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: bytesToBuffer(iv) }, key, bytesToBuffer(plaintext));
   return { iv: bytesToBase64(iv), ciphertext: bytesToBase64(new Uint8Array(buf)) };
 }
 
 export async function decryptJSON<T>(key: CryptoKey, ivB64: string, ciphertextB64: string): Promise<T> {
   const iv = base64ToBytes(ivB64);
   const data = base64ToBytes(ciphertextB64);
-  const buf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
+  const buf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bytesToBuffer(iv) }, key, bytesToBuffer(data));
   return JSON.parse(td.decode(new Uint8Array(buf))) as T;
 }

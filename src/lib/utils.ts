@@ -30,14 +30,14 @@ export type InputLike = {
   type: string;
   accept: string;
   files: FileList | null;
-  onchange: ((this: GlobalEventHandlers, ev: Event) => any) | null;
+  onchange: ((ev: Event) => any) | null;
   click: () => void;
 };
 
 export type CanvasLike = {
   width: number;
   height: number;
-  getContext: (contextId: '2d') => CanvasRenderingContext2D | null;
+  getContext: (contextId: '2d') => any;
   toDataURL: (type?: string, quality?: number) => string;
 };
 
@@ -55,7 +55,7 @@ export function getDocument(): DocumentLike | null {
   return (globalThis as any).document as DocumentLike | null;
 }
 
-export function getLocation(): Location | null {
+export function getLocation(): any {
   if (typeof globalThis === 'undefined') return null;
-  return (globalThis as any).location as Location | null;
+  return (globalThis as any).location;
 }
