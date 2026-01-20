@@ -40,9 +40,33 @@ export default function PinOverlay({ mode, onUnlock }: { mode: 'setup' | 'unlock
         onSubmit={submit}
         className="w-full max-w-sm rounded-xl border border-border bg-card p-6 text-card-foreground shadow-xl"
       >
-        <h1 className="mb-4 text-xl font-semibold">{mode === 'setup' ? 'Create PIN' : 'Enter PIN'}</h1>
-        <p className="mb-4 text-sm text-muted-foreground">
-          Privacy-focused, local-first precious metal tracker. No data leaves your computer.
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted">
+            <img
+              src="/aurasafe-logo.png"
+              alt="AuraSafe logo"
+              className="h-6 w-6"
+            />
+          </div>
+          <div>
+            <div className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              AuraSafe Tracker
+            </div>
+            <h1 className="text-xl font-semibold">{mode === 'setup' ? 'Create PIN' : 'Enter PIN'}</h1>
+          </div>
+        </div>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Track gold and silver holdings with a local-first, privacy-first vault. Your data stays on
+          this device and never leaves your browser.
+        </p>
+        <div className="mb-4 space-y-2 text-xs text-muted-foreground">
+          <div>• Encrypted with your PIN and Web Crypto.</div>
+          <div>• Offline by default, no accounts or cloud sync.</div>
+          <div>• You control access and can wipe anytime.</div>
+        </div>
+        <p className="mb-4 text-xs text-muted-foreground">
+          The PIN unlocks your local vault and generates the encryption key that protects your data
+          on this device.
         </p>
         <div className="space-y-3">
           <input
