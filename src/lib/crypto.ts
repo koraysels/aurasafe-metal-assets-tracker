@@ -44,7 +44,7 @@ export async function deriveKeyFromPin(pin: string, saltB64: string): Promise<Cr
     { name: 'PBKDF2', salt, iterations: 150000, hash: 'SHA-256' },
     baseKey,
     { name: 'AES-GCM', length: 256 },
-    false,
+    true,
     ['encrypt','decrypt']
   );
 }
@@ -88,4 +88,18 @@ export async function decryptJSON<T>(key: CryptoKey, ivB64: string, ciphertextB6
   const data = base64ToBytes(ciphertextB64);
   const buf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bytesToBuffer(iv) }, key, bytesToBuffer(data));
   return JSON.parse(td.decode(new Uint8Array(buf))) as T;
+}
+
+export async function exportKeyToJWK(key: CryptoKey): Promise<JsonWebKey> {
+  return crypto.subtle.exportKey('jwk', key);
+}
+
+export async function importKeyFromJWK(jwk: JsonWebKey): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    'jwk',
+    jwk,
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  );
 }

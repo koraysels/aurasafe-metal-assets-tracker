@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react';
 import PinOverlay from '../components/PinOverlay';
 import Inventory from '../components/Inventory';
 import { getSessionStorage } from '../lib/utils';
-import { deriveKeyFromPin, getOrCreateSalt, getStoredHash, hashPin, setStoredHash } from '../lib/crypto';
+import { deriveKeyFromPin, exportKeyToJWK, getOrCreateSalt, getStoredHash, hashPin, importKeyFromJWK, setStoredHash } from '../lib/crypto';
 
-const SESSION_PIN_KEY = 'as_session_pin';
+const SESSION_KEY_JWK = 'as_session_key_jwk';
 
 export default function Page() {
   const [keyMaterial, setKeyMaterial] = useState<CryptoKey | null>(null);
@@ -14,16 +14,17 @@ export default function Page() {
   useEffect(() => {
     const hasHash = !!getStoredHash();
     setMode(hasHash ? 'unlock' : 'setup');
-    const sessionPin = getSessionStorage()?.getItem(SESSION_PIN_KEY) ?? null;
-    if (!sessionPin || !hasHash) return;
+    const sessionJwkStr = getSessionStorage()?.getItem(SESSION_KEY_JWK) ?? null;
+    if (!sessionJwkStr || !hasHash) return;
     (async () => {
-      const salt = getOrCreateSalt();
-      const existingHash = getStoredHash();
-      if (!existingHash) return;
-      const newHash = await hashPin(sessionPin, salt);
-      if (newHash !== existingHash) return;
-      const key = await deriveKeyFromPin(sessionPin, salt);
-      setKeyMaterial(key);
+      try {
+        const jwk = JSON.parse(sessionJwkStr);
+        const key = await importKeyFromJWK(jwk);
+        setKeyMaterial(key);
+      } catch {
+        // Invalid JWK, clear it
+        getSessionStorage()?.removeItem(SESSION_KEY_JWK);
+      }
     })();
   }, []);
 
@@ -37,19 +38,21 @@ export default function Page() {
       const key = await deriveKeyFromPin(pin, salt);
       setKeyMaterial(key);
       setMode('unlock');
-      sessionStorageSafe?.setItem(SESSION_PIN_KEY, pin);
+      const jwk = await exportKeyToJWK(key);
+      sessionStorageSafe?.setItem(SESSION_KEY_JWK, JSON.stringify(jwk));
       return;
     }
     if (newHash !== existingHash) throw new Error('Incorrect PIN');
     const key = await deriveKeyFromPin(pin, salt);
     setKeyMaterial(key);
-    sessionStorageSafe?.setItem(SESSION_PIN_KEY, pin);
+    const jwk = await exportKeyToJWK(key);
+    sessionStorageSafe?.setItem(SESSION_KEY_JWK, JSON.stringify(jwk));
   }
 
   function onLock() {
     setKeyMaterial(null);
     const sessionStorageSafe = getSessionStorage();
-    sessionStorageSafe?.removeItem(SESSION_PIN_KEY);
+    sessionStorageSafe?.removeItem(SESSION_KEY_JWK);
   }
 
   return (
