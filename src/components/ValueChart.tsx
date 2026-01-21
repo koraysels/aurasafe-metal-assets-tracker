@@ -29,8 +29,11 @@ export default function ValueChart({
 
   if (!hasData) {
     return (
-      <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-muted-foreground/25 text-sm text-muted-foreground">
-        No historical data available
+      <div className="flex flex-col items-center justify-center h-48 rounded-lg border border-dashed border-muted-foreground/25 text-center p-6">
+        <p className="text-sm text-muted-foreground mb-2">No historical data yet</p>
+        <p className="text-xs text-muted-foreground/75">
+          Add assets to see value trends over time
+        </p>
       </div>
     );
   }

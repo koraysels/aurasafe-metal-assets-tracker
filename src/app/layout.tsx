@@ -11,7 +11,7 @@ export const metadata = {
   creator: 'Koray',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
+    statusBarStyle: 'black-translucent',
     title: 'AuraSafe',
   },
   openGraph: {
@@ -25,7 +25,9 @@ export const metadata = {
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 5,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
   themeColor: '#0ea5e9',
 };
 

@@ -84,6 +84,8 @@ export default function Inventory({
     imageDataUrl: '',
   });
 
+  const hasAnyPurchases = purchases.length > 0;
+
   function readValue(target: EventTarget | null) {
     const value = (target as { value?: string } | null)?.value;
     return typeof value === 'string' ? value : '';
@@ -626,46 +628,48 @@ export default function Inventory({
         </CardContent>
       </Card>
 
-      <section className="mb-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-        <Card>
-          <CardContent className="p-4">
-          <div className="text-xs uppercase text-muted-foreground">Basis</div>
-          <div className="text-xl font-semibold sm:text-2xl">{formatMoney(stats.totalBasis, currency)}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-          <div className="text-xs uppercase text-muted-foreground">Current Value</div>
-          <div className="text-xl font-semibold sm:text-2xl">{formatMoney(stats.currentValue, currency)}</div>
-          </CardContent>
-        </Card>
-        <Card className="sm:col-span-2 md:col-span-1">
-          <CardContent className="p-4">
-          <div className="text-xs uppercase text-muted-foreground">Net</div>
-          <div
-            className={`text-xl font-semibold sm:text-2xl ${
-              stats.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'
-            }`}
-          >
-            <span className="inline-flex items-center gap-1">
-              {stats.netProfit >= 0 ? (
-                <svg viewBox="0 0 20 20" className="h-4 w-4 text-emerald-400" aria-hidden="true">
-                  <path d="M10 4l5 6h-3v6H8v-6H5l5-6z" fill="currentColor" />
-                </svg>
-              ) : (
-                <svg viewBox="0 0 20 20" className="h-4 w-4 text-red-400" aria-hidden="true">
-                  <path d="M10 16l-5-6h3V4h4v6h3l-5 6z" fill="currentColor" />
-                </svg>
-              )}
-              <span>{formatMoney(stats.netProfit, currency)}</span>
-            </span>
-            <div className="mt-1 text-sm font-normal text-muted-foreground">
-              {stats.profitPercent.toFixed(2)}%
+      {hasAnyPurchases && (
+        <section className="mb-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+          <Card>
+            <CardContent className="p-4">
+            <div className="text-xs uppercase text-muted-foreground">Basis</div>
+            <div className="text-xl font-semibold sm:text-2xl">{formatMoney(stats.totalBasis, currency)}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+            <div className="text-xs uppercase text-muted-foreground">Current Value</div>
+            <div className="text-xl font-semibold sm:text-2xl">{formatMoney(stats.currentValue, currency)}</div>
+            </CardContent>
+          </Card>
+          <Card className="sm:col-span-2 md:col-span-1">
+            <CardContent className="p-4">
+            <div className="text-xs uppercase text-muted-foreground">Net</div>
+            <div
+              className={`text-xl font-semibold sm:text-2xl ${
+                stats.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'
+              }`}
+            >
+              <span className="inline-flex items-center gap-1">
+                {stats.netProfit >= 0 ? (
+                  <svg viewBox="0 0 20 20" className="h-4 w-4 text-emerald-400" aria-hidden="true">
+                    <path d="M10 4l5 6h-3v6H8v-6H5l5-6z" fill="currentColor" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 20 20" className="h-4 w-4 text-red-400" aria-hidden="true">
+                    <path d="M10 16l-5-6h3V4h4v6h3l-5 6z" fill="currentColor" />
+                  </svg>
+                )}
+                <span>{formatMoney(stats.netProfit, currency)}</span>
+              </span>
+              <div className="mt-1 text-sm font-normal text-muted-foreground">
+                {stats.profitPercent.toFixed(2)}%
+              </div>
             </div>
-          </div>
-          </CardContent>
-        </Card>
-      </section>
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {stats.missingFx > 0 && (
         <Card className="mb-6 border-amber-500/30">
@@ -676,73 +680,77 @@ export default function Inventory({
         </Card>
       )}
 
-      <Card className="mb-6">
-        <CardContent className="p-4 text-sm text-muted-foreground">
-          <div className="mb-2">
-            <div className="font-medium">Gold spot: {formatMoney(spotByMetal.Gold?.price || 0, currency)}/oz • {formatMoney(perGramFromOunce(spotByMetal.Gold?.price || 0), currency)}/g</div>
-            {spotByMetal.Gold?.timestamp && (
-              <div className="text-[10px] text-muted-foreground">
-                as of {new Date(spotByMetal.Gold.timestamp).toLocaleString()}
-              </div>
-            )}
-          </div>
-          <div>
-            <div className="font-medium">Silver spot: {formatMoney(spotByMetal.Silver?.price || 0, currency)}/oz • {formatMoney(perGramFromOunce(spotByMetal.Silver?.price || 0), currency)}/g</div>
-            {spotByMetal.Silver?.timestamp && (
-              <div className="text-[10px] text-muted-foreground">
-                as of {new Date(spotByMetal.Silver.timestamp).toLocaleString()}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      {hasAnyPurchases && (
+        <Card className="mb-6">
+          <CardContent className="p-4 text-sm text-muted-foreground">
+            <div className="mb-2">
+              <div className="font-medium">Gold spot: {formatMoney(spotByMetal.Gold?.price || 0, currency)}/oz • {formatMoney(perGramFromOunce(spotByMetal.Gold?.price || 0), currency)}/g</div>
+              {spotByMetal.Gold?.timestamp && (
+                <div className="text-[10px] text-muted-foreground">
+                  as of {new Date(spotByMetal.Gold.timestamp).toLocaleString()}
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="font-medium">Silver spot: {formatMoney(spotByMetal.Silver?.price || 0, currency)}/oz • {formatMoney(perGramFromOunce(spotByMetal.Silver?.price || 0), currency)}/g</div>
+              {spotByMetal.Silver?.timestamp && (
+                <div className="text-[10px] text-muted-foreground">
+                  as of {new Date(spotByMetal.Silver.timestamp).toLocaleString()}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-      <Card className="mb-6">
-        <CardContent className="p-4">
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <Button
-              variant={chartRange === 'week' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setChartRange('week')}
-            >
-              Week
-            </Button>
-            <Button
-              variant={chartRange === 'month' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setChartRange('month')}
-            >
-              Month
-            </Button>
-            <Button
-              variant={chartRange === 'year' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setChartRange('year')}
-            >
-              Year
-            </Button>
-            <Button
-              variant={chartRange === 'all' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setChartRange('all')}
-              disabled={!firstPurchaseDate}
-            >
-              From Start
-            </Button>
-          </div>
-          <ValueChart
-            goldPrices={historicalPrices.gold}
-            silverPrices={historicalPrices.silver}
-            goldWeight={stats.goldWeight}
-            silverWeight={stats.silverWeight}
-            currency={currency}
-            range={chartRange}
-            firstPurchaseDate={firstPurchaseDate}
-            totalBasis={stats.totalBasis}
-            currentValue={stats.currentValue}
-          />
-        </CardContent>
-      </Card>
+      {hasAnyPurchases && (
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <Button
+                variant={chartRange === 'week' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setChartRange('week')}
+              >
+                Week
+              </Button>
+              <Button
+                variant={chartRange === 'month' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setChartRange('month')}
+              >
+                Month
+              </Button>
+              <Button
+                variant={chartRange === 'year' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setChartRange('year')}
+              >
+                Year
+              </Button>
+              <Button
+                variant={chartRange === 'all' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setChartRange('all')}
+                disabled={!firstPurchaseDate}
+              >
+                From Start
+              </Button>
+            </div>
+            <ValueChart
+              goldPrices={historicalPrices.gold}
+              silverPrices={historicalPrices.silver}
+              goldWeight={stats.goldWeight}
+              silverWeight={stats.silverWeight}
+              currency={currency}
+              range={chartRange}
+              firstPurchaseDate={firstPurchaseDate}
+              totalBasis={stats.totalBasis}
+              currentValue={stats.currentValue}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="mb-6">
         <CardHeader className="pb-2">
@@ -879,15 +887,19 @@ export default function Inventory({
               );
             })}
             {!assetItems.length && (
-              <Card className="bg-muted/30">
-                <CardContent className="p-6 text-center">
-                  <div className="text-sm text-muted-foreground">Add your first asset.</div>
-                  <div className="mt-3 flex justify-center">
-                    <Button onClick={openAddAssetModal}>
-                      <span className="text-lg leading-none">+</span>
-                      Add Asset
-                    </Button>
+              <Card className="bg-gradient-to-br from-muted/50 to-muted/30 border-dashed">
+                <CardContent className="p-8 text-center">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                    <span className="text-3xl">💰</span>
                   </div>
+                  <h3 className="text-lg font-semibold mb-2">Start Tracking Your Precious Metals</h3>
+                  <p className="text-sm text-muted-foreground mb-4 max-w-sm mx-auto">
+                    Add your first gold or silver asset to begin tracking its value over time. Your data is encrypted and stays private on this device.
+                  </p>
+                  <Button onClick={openAddAssetModal} size="lg" className="mt-2">
+                    <span className="text-lg leading-none mr-2">+</span>
+                    Add Your First Asset
+                  </Button>
                 </CardContent>
               </Card>
             )}
