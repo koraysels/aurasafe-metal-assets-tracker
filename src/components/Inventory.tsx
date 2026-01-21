@@ -739,6 +739,7 @@ export default function Inventory({
             range={chartRange}
             firstPurchaseDate={firstPurchaseDate}
             totalBasis={stats.totalBasis}
+            currentValue={stats.currentValue}
           />
         </CardContent>
       </Card>

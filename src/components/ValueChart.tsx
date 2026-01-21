@@ -10,6 +10,7 @@ type ValueChartProps = {
   range: 'week' | 'month' | 'year' | 'all';
   firstPurchaseDate: string | null;
   totalBasis: number;
+  currentValue: number;
 };
 
 export default function ValueChart({
@@ -21,6 +22,7 @@ export default function ValueChart({
   range,
   firstPurchaseDate,
   totalBasis,
+  currentValue,
 }: ValueChartProps) {
   const hasData =
     (goldPrices.length > 0 && goldWeight > 0) || (silverPrices.length > 0 && silverWeight > 0);
@@ -87,7 +89,8 @@ export default function ValueChart({
   });
 
   const firstValue = data[0]?.value || 0;
-  const lastValue = data[data.length - 1]?.value || 0;
+  const lastChartValue = data[data.length - 1]?.value || 0;
+  const lastValue = currentValue > 0 ? currentValue : lastChartValue;
   const change = lastValue - firstValue;
   const changePercent = firstValue > 0 ? (change / firstValue) * 100 : 0;
   const isPositive = change >= 0;
@@ -146,7 +149,7 @@ export default function ValueChart({
           </div>
           <div className={`text-sm font-semibold ${profitPositive ? 'text-emerald-400' : 'text-red-400'}`}>
             {profitPositive ? '+' : ''}
-            {profitPercent.toFixed(2)}% <span className="text-[10px] uppercase">Profit</span>
+            {profitPercent.toFixed(2)}% <span className="text-[10px] uppercase">Net</span>
           </div>
         </div>
       </div>
