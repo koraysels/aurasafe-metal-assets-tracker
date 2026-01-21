@@ -9,6 +9,7 @@ type ValueChartProps = {
   currency: string;
   range: 'week' | 'month' | 'year' | 'all';
   firstPurchaseDate: string | null;
+  totalBasis: number;
 };
 
 export default function ValueChart({
@@ -19,6 +20,7 @@ export default function ValueChart({
   currency,
   range,
   firstPurchaseDate,
+  totalBasis,
 }: ValueChartProps) {
   const hasData =
     (goldPrices.length > 0 && goldWeight > 0) || (silverPrices.length > 0 && silverWeight > 0);
@@ -89,6 +91,8 @@ export default function ValueChart({
   const change = lastValue - firstValue;
   const changePercent = firstValue > 0 ? (change / firstValue) * 100 : 0;
   const isPositive = change >= 0;
+  const profitPercent = totalBasis > 0 ? ((lastValue - totalBasis) / totalBasis) * 100 : 0;
+  const profitPositive = profitPercent >= 0;
 
   const formatValue = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -135,9 +139,15 @@ export default function ValueChart({
     <div>
       <div className="mb-3 flex items-baseline justify-between">
         <div className="text-xs uppercase text-muted-foreground">{getRangeLabel()}</div>
-        <div className={`text-sm font-semibold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
-          {isPositive ? '+' : ''}
-          {changePercent.toFixed(2)}%
+        <div className="text-right text-xs text-muted-foreground">
+          <div className={`text-sm font-semibold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+            {isPositive ? '+' : ''}
+            {changePercent.toFixed(2)}% <span className="text-[10px] uppercase">Price</span>
+          </div>
+          <div className={`text-sm font-semibold ${profitPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+            {profitPositive ? '+' : ''}
+            {profitPercent.toFixed(2)}% <span className="text-[10px] uppercase">Profit</span>
+          </div>
         </div>
       </div>
       <div className="h-48 w-full">
